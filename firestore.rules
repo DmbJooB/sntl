@@ -2,32 +2,39 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
+  
+    function isAdmin() {
+      return request.auth != null && (
+        request.auth.token.admin == true ||
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Administrateur'
+      );
+    }
 
     // Users: read own doc; admin can read/write all
     match /users/{userId} {
       allow read: if request.auth != null;
-      allow write: if request.auth != null && (request.auth.uid == userId || request.auth.token.admin == true);
-      allow create: if request.auth != null && (request.auth.uid == userId || request.auth.token.admin == true);
-      allow update: if request.auth != null && (request.auth.uid == userId || request.auth.token.admin == true);
+      allow write: if request.auth != null && (request.auth.uid == userId || isAdmin());
+      allow create: if request.auth != null && (request.auth.uid == userId || isAdmin());
+      allow update: if request.auth != null && (request.auth.uid == userId || isAdmin());
     }
 
     // Walks: public read; admin write only
     match /walks/{walkId} {
       allow read: if true;
-      allow write: if request.auth != null && request.auth.token.admin == true;
+      allow write: if isAdmin();
     }
 
     // Bank Images: public read; contributors can add; admin can moderate
     match /bankImages/{imageId} {
       allow read: if true;
       allow create: if request.auth != null;
-      allow update, delete: if request.auth != null && (request.auth.uid == resource.data.photographerId || request.auth.token.admin == true);
+      allow update, delete: if request.auth != null && (request.auth.uid == resource.data.photographerId || isAdmin());
     }
 
     // Settings: public read; admin write
     match /settings/{settingId} {
       allow read: if true;
-      allow write: if request.auth != null && request.auth.token.admin == true;
+      allow write: if isAdmin();
     }
   }
 }

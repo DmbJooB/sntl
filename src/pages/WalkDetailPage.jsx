@@ -6,7 +6,8 @@ import 'leaflet/dist/leaflet.css'
 import L from 'leaflet'
 import icon from 'leaflet/dist/images/marker-icon.png'
 import iconShadow from 'leaflet/dist/images/marker-shadow.png'
-import { Share2 } from 'lucide-react'
+import { Share2, Download } from 'lucide-react'
+import { downloadWithWatermark } from '../utils/watermark'
 
 // Fix default icon issue with react-leaflet
 let DefaultIcon = L.icon({
@@ -241,8 +242,33 @@ export default function WalkDetailPage() {
                             {walk.photos.map(photo => (
                                 <div key={photo.id} className="masonry-item" onClick={() => setLightbox(photo)}>
                                     <img src={photo.url} alt={`Photo by ${photo.photographer}`} loading="lazy" />
-                                    <div className="masonry-overlay">
-                                        <p style={{ fontFamily: 'var(--font-accent)', fontSize: '0.85rem', fontWeight: 600 }}>{photo.photographer}</p>
+                                    <div className="masonry-overlay" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+                                        <div>
+                                            <p style={{ fontFamily: 'var(--font-accent)', fontSize: '0.85rem', fontWeight: 600 }}>{photo.photographer}</p>
+                                        </div>
+                                        <div style={{ display: 'flex', gap: '8px' }} onClick={e => e.stopPropagation()}>
+                                            <button
+                                                className="icon-btn-light"
+                                                onClick={() => {
+                                                    const url = photo.url
+                                                    if (navigator.share) {
+                                                        navigator.share({ title: `Photo par ${photo.photographer}`, url })
+                                                    } else {
+                                                        navigator.clipboard.writeText(url).then(() => alert('Lien copié !'))
+                                                    }
+                                                }}
+                                                title="Partager"
+                                            >
+                                                <Share2 size={14} />
+                                            </button>
+                                            <button
+                                                className="icon-btn-light"
+                                                onClick={() => downloadWithWatermark(photo.url, `sunu-nataal-${photo.id || 'photo'}.jpg`)}
+                                                title="Télécharger"
+                                            >
+                                                <Download size={14} />
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
                             ))}

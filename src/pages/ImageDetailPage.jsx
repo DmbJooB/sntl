@@ -4,6 +4,8 @@ import { getImageById, getUserById, getBankImages } from '../services/db'
 import { Download, ShoppingCart, Heart, Share2, Info, ChevronRight, ShieldCheck, Printer } from 'lucide-react'
 import ImageCard from '../components/image-bank/ImageCard'
 import { useCart } from '../contexts/CartContext'
+import { downloadWithWatermark } from '../utils/watermark'
+import WatermarkOverlay from '../components/WatermarkOverlay'
 
 const PriceOption = ({ label, resolution, price, selected, onSelect }) => (
     <div
@@ -49,6 +51,26 @@ export default function ImageDetailPage() {
     const [purchaseMode, setPurchaseMode] = useState('digital')
     const [selectedDigitalOption, setSelectedDigitalOption] = useState('large')
     const [selectedPrintOption, setSelectedPrintOption] = useState('a3')
+
+    const getSelectedDetails = () => {
+        if (purchaseMode === 'digital') {
+            switch (selectedDigitalOption) {
+                case 'small': return { price: 15000, label: 'Numérique - Petite (800x600)' }
+                case 'medium': return { price: 35000, label: 'Numérique - Moyenne (2400x1600)' }
+                case 'large': return { price: 65000, label: 'Numérique - Grande (Originale)' }
+                default: return { price: 65000, label: 'Numérique - Grande (Originale)' }
+            }
+        } else {
+            switch (selectedPrintOption) {
+                case 'a4': return { price: 25000, label: 'Impression - Poster A4' }
+                case 'a3': return { price: 45000, label: 'Impression - Tirage Premium A3' }
+                case 'canvas': return { price: 85000, label: 'Impression - Toile sur châssis' }
+                default: return { price: 45000, label: 'Impression - Tirage Premium A3' }
+            }
+        }
+    }
+    const currentOption = purchaseMode === 'digital' ? selectedDigitalOption : selectedPrintOption;
+    const isCurrentInCart = image ? isInCart(image.id, purchaseMode, currentOption) : false;
 
     useEffect(() => {
         const fetchImageDetails = async () => {
@@ -121,14 +143,7 @@ export default function ImageDetailPage() {
                                         boxShadow: '0 4px 20px rgba(0,0,0,0.08)'
                                     }}
                                 />
-                                {/* Watermark for free/preview */}
-                                <div className="watermark-overlay" style={{ opacity: 0.12 }}>
-                                    <div className="watermark-pattern" style={{ gap: '80px', opacity: 1 }}>
-                                        {Array.from({ length: 8 }).map((_, j) => (
-                                            <span key={j}>SUNU NATAAL</span>
-                                        ))}
-                                    </div>
-                                </div>
+                                <WatermarkOverlay opacity={0.22} />
                             </div>
                         </div>
 
@@ -136,7 +151,7 @@ export default function ImageDetailPage() {
                         <div className="hide-mobile">
                             <h1 style={{ fontSize: '1.8rem', marginBottom: 'var(--sp-2)' }}>{image.title}</h1>
                             <p style={{ color: 'var(--sn-gray)', marginBottom: 'var(--sp-6)' }}>
-                                {image.location} • Photographie par <Link to={`/photographes/${photographer?.slug}`} style={{ color: 'var(--sn-sand)', fontWeight: 500 }}>{photographer?.name}</Link>
+                                {image.location} • Photographie par <Link to={`/ photographes / ${photographer?.slug} `} style={{ color: 'var(--sn-sand)', fontWeight: 500 }}>{photographer?.name}</Link>
                             </p>
 
                             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--sp-2)' }}>
@@ -287,11 +302,8 @@ export default function ImageDetailPage() {
                                         <button
                                             className="btn-dark"
                                             style={{ width: '100%', justifyContent: 'center' }}
-                                            onClick={() => {
-                                                const a = document.createElement('a')
-                                                a.href = image.url
-                                                a.download = `sunu-nataal-${image.id}.jpg`
-                                                a.click()
+                                            onClick={async () => {
+                                                await downloadWithWatermark(image.url, `sunu - nataal - ${image.id}.jpg`)
                                             }}
                                         >
                                             <Download size={20} /> Télécharger gratuitement
@@ -300,10 +312,19 @@ export default function ImageDetailPage() {
                                         <button
                                             className="btn-primary"
                                             style={{ width: '100%', justifyContent: 'center' }}
-                                            onClick={() => addToCart(image)}
+                                            onClick={() => {
+                                                const details = getSelectedDetails();
+                                                addToCart({
+                                                    ...image,
+                                                    purchaseMode,
+                                                    selectedOption: currentOption,
+                                                    customPrice: details.price,
+                                                    formatLabel: details.label
+                                                })
+                                            }}
                                         >
                                             <ShoppingCart size={20} />
-                                            {isInCart(image.id) ? '✓ Dans le panier' : 'Ajouter au panier'}
+                                            {isCurrentInCart ? '✓ Dans le panier (ce format)' : 'Ajouter au panier'}
                                         </button>
                                     )}
 
@@ -376,7 +397,7 @@ export default function ImageDetailPage() {
                                     </div>
                                     <div>
                                         <div style={{ fontWeight: 600 }}>{photographer.name}</div>
-                                        <Link to={`/photographes/${photographer.slug}`} style={{ fontSize: '0.85rem', color: 'var(--sn-sand)' }}>
+                                        <Link to={`/ photographes / ${photographer.slug} `} style={{ fontSize: '0.85rem', color: 'var(--sn-sand)' }}>
                                             Voir le portfolio
                                         </Link>
                                     </div>
@@ -401,21 +422,21 @@ export default function ImageDetailPage() {
             </div>
 
             <style>{`
-                .detail-grid {
-                    display: grid;
-                    grid-template-columns: 1fr 360px;
-                    gap: var(--sp-8);
-                    align-items: start;
-                }
-                @media (max-width: 900px) {
-                    .detail-grid {
-                        grid-template-columns: 1fr;
-                    }
-                    .hide-mobile {
-                        display: none;
-                    }
-                }
-            `}</style>
+    .detail - grid {
+    display: grid;
+    grid - template - columns: 1fr 360px;
+    gap: var(--sp - 8);
+    align - items: start;
+}
+@media(max - width: 900px) {
+                    .detail - grid {
+        grid - template - columns: 1fr;
+    }
+                    .hide - mobile {
+        display: none;
+    }
+}
+`}</style>
         </div>
     )
 }

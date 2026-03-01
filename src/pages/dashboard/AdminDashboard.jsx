@@ -1,6 +1,10 @@
 import React, { useState, useEffect } from 'react'
-import { Users, Image as ImageIcon, Map as MapIcon, Settings, LayoutDashboard, ShieldCheck, Check, X, Edit, Trash2, Search, User, Shield, Ban, UploadCloud, Plus } from 'lucide-react'
-import { getWalks, getUsers, getPendingImages, approveImage, rejectImage, getAppearanceSettings, updateAppearanceSettings, uploadImageToStorage, addImage, addWalk, updateWalk, deleteWalk } from '../../services/db'
+import { Users, Image as ImageIcon, Map as MapIcon, Settings, LayoutDashboard, ShieldCheck, Check, X, Edit, Trash2, Search, User, Shield, Ban, UploadCloud, Plus, CreditCard, Mail } from 'lucide-react'
+import {
+    getWalks, getUsers, getPendingImages, approveImage, rejectImage, getAppearanceSettings,
+    updateAppearanceSettings, uploadImageToStorage, addImage, addWalk, updateWalk, deleteWalk,
+    getBankImages, updateImage, deleteImage, updateUser, deleteUser
+} from '../../services/db'
 
 export default function AdminDashboard() {
     const [activeTab, setActiveTab] = useState('overview')
@@ -8,6 +12,8 @@ export default function AdminDashboard() {
     const [walksList, setWalksList] = useState([])
     const [userSearch, setUserSearch] = useState('')
     const [usersList, setUsersList] = useState([])
+    const [bankImages, setBankImages] = useState([])
+    const [bankSearch, setBankSearch] = useState('')
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState(null)
 
@@ -16,24 +22,26 @@ export default function AdminDashboard() {
         const fetchData = async () => {
             setLoading(true);
             try {
-                const [walks, users, pending, settings] = await Promise.all([
+                const [walks, users, pending, settings, bank] = await Promise.all([
                     getWalks(),
                     getUsers(),
                     getPendingImages(),
-                    getAppearanceSettings()
+                    getAppearanceSettings(),
+                    getBankImages()
                 ]);
 
                 if (isMounted) {
                     setWalksList(walks);
                     setUsersList(users.map((u, i) => ({
+                        status: 'Actif',
+                        ...u,
                         id: u.uid || u.id,
                         name: u.displayName || u.name || 'Inconnu',
                         email: u.email || `${u.slug || 'user'}@example.com`,
                         role: u.role || (i === 0 ? 'Administrateur' : (u.isMember ? 'Membre' : 'Utilisateur')),
-                        status: 'Actif',
-                        ...u
                     })));
                     setPendingPhotos(pending);
+                    setBankImages(bank);
                     if (settings) {
                         setAppearanceSettings(prev => ({ ...prev, ...settings }));
                     }
@@ -56,8 +64,59 @@ export default function AdminDashboard() {
     const [selectedUploadWalk, setSelectedUploadWalk] = useState('')
     const [uploadFiles, setUploadFiles] = useState([])
     const [isUploadingFiles, setIsUploadingFiles] = useState(false)
+    const [uploadIsPremium, setUploadIsPremium] = useState(false)
+    const [uploadAssignedUser, setUploadAssignedUser] = useState('')
+
+    // Image Edit Modal State
+    const [isImageModalOpen, setIsImageModalOpen] = useState(false)
+    const [editingImage, setEditingImage] = useState(null)
+    const [imageFormData, setImageFormData] = useState({
+        title: '',
+        photographer: '',
+        photographerId: '',
+        isPremium: false,
+        category: '',
+        price: ''
+    })
+
+    const openImageModal = (img) => {
+        setEditingImage(img)
+        setImageFormData({
+            title: img.title || '',
+            photographer: img.photographer || '',
+            photographerId: img.photographerId || '',
+            isPremium: img.isPremium || false,
+            category: img.category || '',
+            price: img.price || ''
+        })
+        setIsImageModalOpen(true)
+    }
+
+    const handleSaveImageEdit = async (e) => {
+        e.preventDefault()
+        try {
+            if (editingImage.source === 'bank') {
+                await updateImage(editingImage.id, imageFormData)
+                setBankImages(prev => prev.map(img => img.id === editingImage.id ? { ...img, ...imageFormData } : img))
+            } else if (editingImage.source === 'walk') {
+                const walk = walksList.find(w => w.id === editingImage.walkId);
+                if (walk) {
+                    const updatedPhotos = (walk.photos || []).map(p =>
+                        p.id === editingImage.id ? { ...p, ...imageFormData } : p
+                    );
+                    await updateWalk(walk.id, { photos: updatedPhotos });
+                    setWalksList(prev => prev.map(w => w.id === walk.id ? { ...w, photos: updatedPhotos } : w));
+                }
+            }
+            setIsImageModalOpen(false)
+        } catch (error) {
+            console.error("Error updating image:", error)
+            alert("Erreur lors de la mise à jour de l'image")
+        }
+    }
 
     // Appearance Settings State
+    const [settingsTab, setSettingsTab] = useState('general')
     const [appearanceSettings, setAppearanceSettings] = useState({
         siteName: 'Sunu Nataal',
         contactEmail: 'support@sununataal.com',
@@ -75,6 +134,16 @@ export default function AdminDashboard() {
         revenueSharePrintPhoto: 60,
         homeCover: '',
         walksCover: '',
+        // SMTP
+        smtpHost: 'smtp.gmail.com',
+        smtpPort: 465,
+        smtpUser: 'contact@sununataal.com',
+        smtpPass: '',
+        // Payments
+        stripePublicKey: 'pk_test_xxxxxxxxxxxxxxxxx',
+        stripeSecretKey: 'sk_test_xxxxxxxxxxxxxxxxx',
+        paydunyaPublicKey: 'pk_test_xxxxxxxxxxxxxxxxx',
+        paydunyaPrivateKey: 'sk_test_xxxxxxxxxxxxxxxxx',
         footerLinks: [
             { id: 1, label: 'À propos', url: '/about' },
             { id: 2, label: 'Conditions Générales', url: '/terms' },
@@ -83,9 +152,9 @@ export default function AdminDashboard() {
         ],
         mainMenuLinks: [
             { id: 1, label: 'Accueil', url: '/' },
-            { id: 2, label: "La Banque d'images", url: '/image-bank' },
+            { id: 2, label: "La Banque d'images", url: '/banque-images' },
             { id: 3, label: 'Les Randonnées', url: '/randonnees' },
-            { id: 4, label: 'Le Collectif', url: '/photographers' }
+            { id: 4, label: 'Le Collectif', url: '/photographes' }
         ]
     })
 
@@ -100,11 +169,30 @@ export default function AdminDashboard() {
         }))
     }
 
+    const predefinedPages = [
+        { label: 'Accueil', url: '/' },
+        { label: 'Randonnées', url: '/randonnees' },
+        { label: 'Photographes', url: '/photographes' },
+        { label: "Banque d'images", url: '/banque-images' },
+        { label: 'Événements', url: '/evenements' },
+        { label: 'Feed', url: '/feed' },
+        { label: 'Panier', url: '/panier' },
+        { label: 'Print Store', url: '/print-store' }
+    ];
+
     const handleUpdateLink = (section, id, field, value) => {
-        setAppearanceSettings(prev => ({
-            ...prev,
-            [section]: prev[section].map(link => link.id === id ? { ...link, [field]: value } : link)
-        }))
+        setAppearanceSettings(prev => {
+            const newLinks = prev[section].map(link => {
+                if (link.id !== id) return link;
+                const updated = { ...link, [field]: value };
+                if (field === 'url' && value !== 'custom' && !link.label) {
+                    const pre = predefinedPages.find(p => p.url === value);
+                    if (pre) updated.label = pre.label;
+                }
+                return updated;
+            });
+            return { ...prev, [section]: newLinks };
+        })
     }
 
     const handleRemoveLink = (section, id) => {
@@ -114,12 +202,36 @@ export default function AdminDashboard() {
         }))
     }
 
-    const handleCoverUpload = (e, field) => {
+    const handleMoveLink = (section, id, direction) => {
+        setAppearanceSettings(prev => {
+            const links = [...prev[section]];
+            const index = links.findIndex(l => l.id === id);
+            if (index < 0) return prev;
+            if (direction === 'up' && index > 0) {
+                [links[index - 1], links[index]] = [links[index], links[index - 1]];
+            } else if (direction === 'down' && index < links.length - 1) {
+                [links[index + 1], links[index]] = [links[index], links[index + 1]];
+            }
+            const updatedLinks = links.map((link, i) => ({ ...link, order: i }));
+            return { ...prev, [section]: updatedLinks };
+        });
+    }
+
+    const handleCoverUpload = async (e, field) => {
         if (e.target.files && e.target.files.length > 0) {
-            setAppearanceSettings(prev => ({
-                ...prev,
-                [field]: URL.createObjectURL(e.target.files[0])
-            }))
+            const file = e.target.files[0];
+            try {
+                const url = await uploadImageToStorage(file, 'settings');
+                if (url) {
+                    setAppearanceSettings(prev => ({
+                        ...prev,
+                        [field]: url
+                    }));
+                }
+            } catch (error) {
+                console.error("Erreur détaillée lors du téléchargement de l'image:", error);
+                alert(`Erreur lors du téléchargement de l'image: ${error.message}`);
+            }
         }
     }
 
@@ -138,6 +250,7 @@ export default function AdminDashboard() {
         cover: '',
         photographerId: ''
     })
+    const [viewingUser, setViewingUser] = useState(null)
 
     const openModal = (walk = null) => {
         if (walk) {
@@ -255,9 +368,62 @@ export default function AdminDashboard() {
     }
 
     const filteredUsers = usersList.filter(user =>
-        user.name.toLowerCase().includes(userSearch.toLowerCase()) ||
-        user.email.toLowerCase().includes(userSearch.toLowerCase())
+        (user.name || '').toLowerCase().includes(userSearch.toLowerCase()) ||
+        (user.email || '').toLowerCase().includes(userSearch.toLowerCase())
     )
+
+    const handleEditUserRole = async (user) => {
+        const roles = ['Utilisateur', 'Contributeur', 'Membre', 'Administrateur'];
+        const currentIndex = roles.indexOf(user.role || 'Utilisateur');
+        const nextRole = roles[(currentIndex + 1) % roles.length];
+
+        if (window.confirm(`Changer le rôle de ${user.name} en ${nextRole} ?`)) {
+            try {
+                // Determine if it's a mock user (starts with mock- or new_user_)
+                if (user.id.startsWith('mock-') || user.id.startsWith('new_user_')) {
+                    setUsersList(usersList.map(u => u.id === user.id ? { ...u, role: nextRole } : u));
+                } else {
+                    await updateUser(user.id, { role: nextRole });
+                    setUsersList(usersList.map(u => u.id === user.id ? { ...u, role: nextRole } : u));
+                }
+            } catch (err) {
+                console.error("Erreur:", err);
+                alert("Erreur lors de la modification du rôle.");
+            }
+        }
+    }
+
+    const handleBanUser = async (user) => {
+        const newStatus = user.status === 'Actif' ? 'Banni' : 'Actif';
+        if (window.confirm(`Voulez-vous ${newStatus === 'Banni' ? 'bannir' : 'réactiver'} ${user.name} ?`)) {
+            try {
+                if (user.id.startsWith('mock-') || user.id.startsWith('new_user_')) {
+                    setUsersList(usersList.map(u => u.id === user.id ? { ...u, status: newStatus } : u));
+                } else {
+                    await updateUser(user.id, { status: newStatus });
+                    setUsersList(usersList.map(u => u.id === user.id ? { ...u, status: newStatus } : u));
+                }
+            } catch (err) {
+                console.error("Erreur:", err);
+                alert("Erreur lors de la modification du statut.");
+            }
+        }
+    }
+
+    const handleDeleteUser = async (user) => {
+        if (!window.confirm('Voulez-vous vraiment supprimer cet utilisateur ? Cette action est irréversible.')) return;
+        try {
+            if (user.id.startsWith('mock-') || user.id.startsWith('new_user_')) {
+                setUsersList(usersList.filter(u => u.id !== user.id));
+            } else {
+                await deleteUser(user.id);
+                setUsersList(usersList.filter(u => u.id !== user.id));
+            }
+        } catch (err) {
+            console.error("Erreur:", err);
+            alert("Erreur lors de la suppression de l'utilisateur.");
+        }
+    }
 
     const handleModerate = async (id, action) => {
         try {
@@ -329,6 +495,12 @@ export default function AdminDashboard() {
                                         {pendingPhotos.length}
                                     </span>
                                 )}
+                            </button>
+                            <button onClick={() => setActiveTab('bank')} style={navItemStyle('bank')}>
+                                <ImageIcon size={18} /> Banque d'images
+                                <span style={{ background: '#eee', color: 'var(--sn-gray)', padding: '2px 8px', borderRadius: '12px', fontSize: '0.7rem', marginLeft: 'auto' }}>
+                                    {bankImages.length}
+                                </span>
                             </button>
                             <button onClick={() => setActiveTab('walks')} style={navItemStyle('walks')}>
                                 <MapIcon size={18} /> Randonnées
@@ -416,6 +588,110 @@ export default function AdminDashboard() {
                                     )}
                                 </div>
                             </>
+                        )}
+
+                        {activeTab === 'bank' && (
+                            <div style={{ background: 'white', borderRadius: 'var(--radius-md)', padding: 'var(--sp-6)', border: '1px solid var(--sn-border)' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--sp-6)' }}>
+                                    <h2 style={{ fontSize: '1.2rem', margin: 0 }}>Gestion de toutes les images</h2>
+                                    <div style={{ display: 'flex', gap: '10px' }}>
+                                        <div style={{ position: 'relative' }}>
+                                            <Search size={16} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--sn-gray)' }} />
+                                            <input
+                                                type="text"
+                                                placeholder="Rechercher partout..."
+                                                value={bankSearch}
+                                                onChange={(e) => setBankSearch(e.target.value)}
+                                                style={{ padding: '8px 12px 8px 32px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--sn-border)', fontSize: '0.9rem', width: '300px' }}
+                                            />
+                                        </div>
+                                        <button onClick={() => setActiveTab('uploads')} className="btn-primary" style={{ padding: '8px 16px', fontSize: '0.9rem' }}>+ Importer</button>
+                                    </div>
+                                </div>
+
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 'var(--sp-4)' }}>
+                                    {[
+                                        ...bankImages.map(img => ({ ...img, source: 'bank' })),
+                                        ...walksList.flatMap(w => (w.photos || []).map(p => ({ ...p, source: 'walk', walkId: w.id, walkTitle: w.title })))
+                                    ]
+                                        .filter(img =>
+                                            img.title?.toLowerCase().includes(bankSearch.toLowerCase()) ||
+                                            img.photographer?.toLowerCase().includes(bankSearch.toLowerCase()) ||
+                                            (img.source === 'walk' && img.walkTitle?.toLowerCase().includes(bankSearch.toLowerCase()))
+                                        )
+                                        .map(img => (
+                                            <div key={img.id} style={{ border: '1px solid var(--sn-border)', borderRadius: 'var(--radius-sm)', overflow: 'hidden', background: 'white', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}>
+                                                <div style={{ position: 'relative', height: '160px', background: '#eee' }}>
+                                                    <img src={img.url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                                    <div style={{ position: 'absolute', top: 8, right: 8, display: 'flex', gap: 4 }}>
+                                                        {img.source === 'walk' && (
+                                                            <span style={{ background: 'var(--sn-black)', color: 'white', fontSize: '0.65rem', padding: '2px 8px', borderRadius: '12px', fontWeight: 600 }}>RANDONNÉE</span>
+                                                        )}
+                                                        {img.isPremium ? (
+                                                            <span style={{ background: 'var(--sn-sand)', color: 'white', fontSize: '0.65rem', padding: '2px 8px', borderRadius: '12px', fontWeight: 600 }}>PREMIUM</span>
+                                                        ) : (
+                                                            <span style={{ background: 'var(--sn-success)', color: 'white', fontSize: '0.65rem', padding: '2px 8px', borderRadius: '12px', fontWeight: 600 }}>GRATUIT</span>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                                <div style={{ padding: '12px' }}>
+                                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
+                                                        <div style={{ fontSize: '0.9rem', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{img.title || 'Sans titre'}</div>
+                                                        <button onClick={() => openImageModal(img)} style={{ padding: '4px', color: 'var(--sn-gray)', marginLeft: '4px', background: 'none', border: 'none', cursor: 'pointer' }}>
+                                                            <Edit size={14} />
+                                                        </button>
+                                                    </div>
+
+                                                    <div style={{ marginBottom: '12px' }}>
+                                                        <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--sn-gray)' }}>
+                                                            Par: <span style={{ fontWeight: 600 }}>{img.photographer || 'Inconnu'}</span>
+                                                        </p>
+                                                        {img.source === 'walk' && (
+                                                            <p style={{ margin: 0, fontSize: '0.7rem', color: 'var(--sn-sand)', fontWeight: 500 }}>
+                                                                Rando: {img.walkTitle}
+                                                            </p>
+                                                        )}
+                                                    </div>
+
+                                                    <div style={{ display: 'flex', gap: '8px' }}>
+                                                        <button
+                                                            className="btn-secondary"
+                                                            onClick={() => openImageModal(img)}
+                                                            style={{ flex: 1, padding: '6px', fontSize: '0.8rem' }}
+                                                        >
+                                                            Gérer
+                                                        </button>
+
+                                                        <button
+                                                            onClick={async () => {
+                                                                if (window.confirm('Supprimer cette image définitivement ?')) {
+                                                                    try {
+                                                                        if (img.source === 'bank') {
+                                                                            await deleteImage(img.id);
+                                                                            setBankImages(prev => prev.filter(p => p.id !== img.id));
+                                                                        } else {
+                                                                            const walk = walksList.find(w => w.id === img.walkId);
+                                                                            if (walk) {
+                                                                                const updatedPhotos = walk.photos.filter(p => p.id !== img.id);
+                                                                                await updateWalk(walk.id, { photos: updatedPhotos });
+                                                                                setWalksList(prev => prev.map(w => w.id === walk.id ? { ...w, photos: updatedPhotos } : w));
+                                                                            }
+                                                                        }
+                                                                    } catch (e) {
+                                                                        console.error(e);
+                                                                    }
+                                                                }
+                                                            }}
+                                                            style={{ padding: '6px', borderRadius: '4px', border: '1px solid rgba(239, 68, 68, 0.2)', color: 'var(--sn-error)', background: 'none', cursor: 'pointer' }}
+                                                        >
+                                                            <Trash2 size={16} />
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                </div>
+                            </div>
                         )}
 
                         {activeTab === 'walks' && (
@@ -545,14 +821,17 @@ export default function AdminDashboard() {
                                                         </span>
                                                     </td>
                                                     <td style={{ padding: '16px 0', textAlign: 'right' }}>
-                                                        <button style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', color: 'var(--sn-gray)', marginRight: '8px' }} title="Voir le profil">
+                                                        <button onClick={() => setViewingUser(user)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', color: 'var(--sn-black)', marginRight: '8px' }} title="Voir le profil">
                                                             <User size={16} />
                                                         </button>
-                                                        <button style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', color: 'var(--sn-gray)', marginRight: '8px' }} title="Modifier le rôle">
+                                                        <button onClick={() => handleEditUserRole(user)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', color: 'var(--sn-gray)', marginRight: '8px' }} title="Modifier le rôle">
                                                             <Shield size={16} />
                                                         </button>
-                                                        <button style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', color: 'var(--sn-error)' }} title="Bannir">
-                                                            <Ban size={16} />
+                                                        <button onClick={() => handleBanUser(user)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', color: user.status === 'Banni' ? 'var(--sn-success)' : 'var(--sn-error)', marginRight: '8px' }} title={user.status === 'Banni' ? 'Réactiver' : 'Bannir'}>
+                                                            {user.status === 'Banni' ? <Check size={16} /> : <Ban size={16} />}
+                                                        </button>
+                                                        <button onClick={() => handleDeleteUser(user)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', color: 'var(--sn-error)' }} title="Supprimer">
+                                                            <Trash2 size={16} />
                                                         </button>
                                                     </td>
                                                 </tr>
@@ -596,6 +875,37 @@ export default function AdminDashboard() {
                                                     <option value={w.id} key={w.id}>{w.title} ({new Date(w.date).getFullYear()})</option>
                                                 ))}
                                             </select>
+                                        </div>
+                                    )}
+
+                                    {uploadDestination === 'bank' && (
+                                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--sp-4)', marginTop: 'var(--sp-4)' }}>
+                                            <div>
+                                                <label style={{ display: 'block', fontSize: '0.9rem', marginBottom: 'var(--sp-2)', fontWeight: 500 }}>Type d'image :</label>
+                                                <div style={{ display: 'flex', gap: 'var(--sp-4)', background: 'white', padding: '10px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--sn-border)' }}>
+                                                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.9rem' }}>
+                                                        <input type="radio" name="pricing" checked={!uploadIsPremium} onChange={() => setUploadIsPremium(false)} />
+                                                        Gratuit
+                                                    </label>
+                                                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.9rem' }}>
+                                                        <input type="radio" name="pricing" checked={uploadIsPremium} onChange={() => setUploadIsPremium(true)} />
+                                                        Premium (Payant)
+                                                    </label>
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <label style={{ display: 'block', fontSize: '0.9rem', marginBottom: 'var(--sp-2)', fontWeight: 500 }}>Attribuer à un utilisateur :</label>
+                                                <select
+                                                    value={uploadAssignedUser}
+                                                    onChange={(e) => setUploadAssignedUser(e.target.value)}
+                                                    style={{ width: '100%', padding: '10px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--sn-border)', background: 'white' }}
+                                                >
+                                                    <option value="">-- Aucun (Admin) --</option>
+                                                    {usersList.map(u => (
+                                                        <option key={u.id} value={u.id}>{u.name} ({u.role})</option>
+                                                    ))}
+                                                </select>
+                                            </div>
                                         </div>
                                     )}
                                 </div>
@@ -646,9 +956,11 @@ export default function AdminDashboard() {
                                                         await addImage({
                                                             title: uploaded.name,
                                                             url: uploaded.url,
-                                                            photographerId: 'admin',
-                                                            photographer: 'SNTL Admin',
+                                                            photographerId: uploadAssignedUser || 'admin',
+                                                            photographer: uploadAssignedUser ? (usersList.find(u => String(u.id) === String(uploadAssignedUser))?.name || 'Inconnu') : 'SNTL Admin',
                                                             status: 'approved',
+                                                            isPremium: uploadIsPremium,
+                                                            price: uploadIsPremium ? 'premium' : 'free',
                                                             createdAt: new Date().toISOString()
                                                         })
                                                     }
@@ -659,8 +971,8 @@ export default function AdminDashboard() {
                                                             id: `photo_${Date.now()}_${Math.random().toString(36).slice(2)}`,
                                                             url: u.url,
                                                             title: u.name,
-                                                            photographerId: 'admin',
-                                                            photographer: 'SNTL Admin',
+                                                            photographerId: uploadAssignedUser || 'admin',
+                                                            photographer: uploadAssignedUser ? (usersList.find(u => String(u.id) === String(uploadAssignedUser))?.name || 'Inconnu') : 'SNTL Admin',
                                                             addedAt: new Date().toISOString()
                                                         }))
                                                         await updateWalk(walk.id, {
@@ -687,265 +999,390 @@ export default function AdminDashboard() {
 
                         {activeTab === 'settings' && (
                             <div style={{ background: 'white', borderRadius: 'var(--radius-md)', padding: 'var(--sp-6)', border: '1px solid var(--sn-border)' }}>
-                                <h2 style={{ fontSize: '1.2rem', marginBottom: 'var(--sp-6)' }}>Configuration de la Plateforme</h2>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--sp-6)' }}>
+                                    <h2 style={{ fontSize: '1.2rem', margin: 0 }}>Configuration de la Plateforme</h2>
+                                </div>
+
+                                {/* Tabs Navigation */}
+                                <div style={{ display: 'flex', gap: 'var(--sp-2)', borderBottom: '1px solid var(--sn-border)', paddingBottom: 'var(--sp-4)', marginBottom: 'var(--sp-6)', overflowX: 'auto', whiteSpace: 'nowrap' }}>
+                                    {[
+                                        { id: 'general', label: 'Général', icon: <Settings size={16} /> },
+                                        { id: 'appearance', label: 'Apparence', icon: <ImageIcon size={16} /> },
+                                        { id: 'pricing', label: 'Tarification', icon: <CreditCard size={16} /> },
+                                        { id: 'payments', label: 'Paiements', icon: <CreditCard size={16} /> },
+                                        { id: 'smtp', label: 'Emails & SMTP', icon: <Mail size={16} /> }
+                                    ].map(tab => (
+                                        <button
+                                            key={tab.id}
+                                            type="button"
+                                            onClick={() => setSettingsTab(tab.id)}
+                                            style={{
+                                                padding: '8px 16px',
+                                                background: settingsTab === tab.id ? 'var(--sn-black)' : 'transparent',
+                                                color: settingsTab === tab.id ? 'white' : 'var(--sn-gray-dark)',
+                                                border: 'none',
+                                                borderRadius: 'var(--radius-sm)',
+                                                fontWeight: settingsTab === tab.id ? 600 : 500,
+                                                cursor: 'pointer',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '8px',
+                                                transition: 'all 0.2s'
+                                            }}
+                                        >
+                                            {tab.icon} {tab.label}
+                                        </button>
+                                    ))}
+                                </div>
 
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--sp-8)' }}>
 
                                     {/* Apparence & Visuel (Nouveau) */}
-                                    <section style={{ background: '#f8fafc', padding: 'var(--sp-6)', borderRadius: 'var(--radius-md)', border: '1px solid var(--sn-border-light)' }}>
-                                        <h3 style={{ fontSize: '1.2rem', color: 'var(--sn-black)', marginBottom: 'var(--sp-6)', borderBottom: '2px solid var(--sn-sand-pale)', paddingBottom: 'var(--sp-3)', display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
-                                            <ImageIcon size={20} /> Apparence & Visuel
-                                        </h3>
+                                    {settingsTab === 'appearance' && (
+                                        <section style={{ background: '#f8fafc', padding: 'var(--sp-6)', borderRadius: 'var(--radius-md)', border: '1px solid var(--sn-border-light)' }}>
+                                            <h3 style={{ fontSize: '1.2rem', color: 'var(--sn-black)', marginBottom: 'var(--sp-6)', borderBottom: '2px solid var(--sn-sand-pale)', paddingBottom: 'var(--sp-3)', display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+                                                <ImageIcon size={20} /> Apparence & Visuel
+                                            </h3>
 
-                                        <div style={{ marginBottom: 'var(--sp-8)' }}>
-                                            <h4 style={{ fontSize: '1.05rem', marginBottom: 'var(--sp-4)', color: 'var(--sn-gray-dark)' }}>Images de Couverture</h4>
-                                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 'var(--sp-6)' }}>
-                                                {/* Home Cover */}
-                                                <div style={{ background: 'white', borderRadius: 'var(--radius-sm)', border: '1px solid var(--sn-border)', padding: 'var(--sp-4)' }}>
-                                                    <label style={{ display: 'block', fontSize: '0.95rem', fontWeight: 600, marginBottom: 'var(--sp-3)' }}>Page d'Accueil</label>
-                                                    <div style={{ position: 'relative', height: '150px', background: '#f0f0f0', borderRadius: 'var(--radius-sm)', overflow: 'hidden', marginBottom: 'var(--sp-3)', border: '1px dashed var(--sn-border-dark)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                                        {appearanceSettings.homeCover ? (
-                                                            <img src={appearanceSettings.homeCover} alt="Home Cover" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                                                        ) : (
-                                                            <div style={{ textAlign: 'center', color: 'var(--sn-gray)' }}>
-                                                                <UploadCloud size={32} style={{ margin: '0 auto var(--sp-2)' }} />
-                                                                <span style={{ fontSize: '0.85rem' }}>Aucune image</span>
-                                                            </div>
+                                            <div style={{ marginBottom: 'var(--sp-8)' }}>
+                                                <h4 style={{ fontSize: '1.05rem', marginBottom: 'var(--sp-4)', color: 'var(--sn-gray-dark)' }}>Images de Couverture</h4>
+                                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 'var(--sp-6)' }}>
+                                                    {/* Home Cover */}
+                                                    <div style={{ background: 'white', borderRadius: 'var(--radius-sm)', border: '1px solid var(--sn-border)', padding: 'var(--sp-4)' }}>
+                                                        <label style={{ display: 'block', fontSize: '0.95rem', fontWeight: 600, marginBottom: 'var(--sp-3)' }}>Page d'Accueil</label>
+                                                        <div style={{ position: 'relative', height: '150px', background: '#f0f0f0', borderRadius: 'var(--radius-sm)', overflow: 'hidden', marginBottom: 'var(--sp-3)', border: '1px dashed var(--sn-border-dark)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                                            {appearanceSettings.homeCover ? (
+                                                                <img src={appearanceSettings.homeCover} alt="Home Cover" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                                            ) : (
+                                                                <div style={{ textAlign: 'center', color: 'var(--sn-gray)' }}>
+                                                                    <UploadCloud size={32} style={{ margin: '0 auto var(--sp-2)' }} />
+                                                                    <span style={{ fontSize: '0.85rem' }}>Aucune image</span>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                        <label className="btn-secondary" style={{ display: 'block', textAlign: 'center', padding: '8px', cursor: 'pointer', fontSize: '0.9rem' }}>
+                                                            Changer l'image
+                                                            <input type="file" accept="image/*" hidden onChange={(e) => handleCoverUpload(e, 'homeCover')} />
+                                                        </label>
+                                                    </div>
+
+                                                    {/* Walks Cover */}
+                                                    <div style={{ background: 'white', borderRadius: 'var(--radius-sm)', border: '1px solid var(--sn-border)', padding: 'var(--sp-4)' }}>
+                                                        <label style={{ display: 'block', fontSize: '0.95rem', fontWeight: 600, marginBottom: 'var(--sp-3)' }}>Page Randonnées</label>
+                                                        <div style={{ position: 'relative', height: '150px', background: '#f0f0f0', borderRadius: 'var(--radius-sm)', overflow: 'hidden', marginBottom: 'var(--sp-3)', border: '1px dashed var(--sn-border-dark)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                                            {appearanceSettings.walksCover ? (
+                                                                <img src={appearanceSettings.walksCover} alt="Walks Cover" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                                            ) : (
+                                                                <div style={{ textAlign: 'center', color: 'var(--sn-gray)' }}>
+                                                                    <UploadCloud size={32} style={{ margin: '0 auto var(--sp-2)' }} />
+                                                                    <span style={{ fontSize: '0.85rem' }}>Aucune image</span>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                        <label className="btn-secondary" style={{ display: 'block', textAlign: 'center', padding: '8px', cursor: 'pointer', fontSize: '0.9rem' }}>
+                                                            Changer l'image
+                                                            <input type="file" accept="image/*" hidden onChange={(e) => handleCoverUpload(e, 'walksCover')} />
+                                                        </label>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div style={{ display: 'grid', gap: 'var(--sp-8)' }}>
+                                                {/* Main Menu Links */}
+                                                <div>
+                                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--sp-4)' }}>
+                                                        <h4 style={{ fontSize: '1.05rem', color: 'var(--sn-gray-dark)', margin: 0 }}>Menu Principal</h4>
+                                                        <button onClick={() => handleAddLink('mainMenuLinks')} className="btn-secondary" style={{ padding: '6px 12px', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                            <Plus size={14} /> Ajouter un lien
+                                                        </button>
+                                                    </div>
+                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--sp-3)' }}>
+                                                        {appearanceSettings.mainMenuLinks.map((link, index) => {
+                                                            const isCustom = !predefinedPages.some(p => p.url === link.url) && link.url !== '';
+                                                            const selectValue = isCustom ? 'custom' : (link.url || '');
+                                                            return (
+                                                                <div key={link.id} style={{ display: 'flex', gap: 'var(--sp-2)', alignItems: 'center', background: 'white', padding: 'var(--sp-3)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--sn-border)' }}>
+                                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                                                        <button onClick={() => handleMoveLink('mainMenuLinks', link.id, 'up')} disabled={index === 0} style={{ background: 'none', border: 'none', cursor: index === 0 ? 'default' : 'pointer', opacity: index === 0 ? 0.3 : 1, padding: '2px' }}>↑</button>
+                                                                        <button onClick={() => handleMoveLink('mainMenuLinks', link.id, 'down')} disabled={index === appearanceSettings.mainMenuLinks.length - 1} style={{ background: 'none', border: 'none', cursor: index === appearanceSettings.mainMenuLinks.length - 1 ? 'default' : 'pointer', opacity: index === appearanceSettings.mainMenuLinks.length - 1 ? 0.3 : 1, padding: '2px' }}>↓</button>
+                                                                    </div>
+                                                                    <input
+                                                                        type="text"
+                                                                        placeholder="Titre du menu"
+                                                                        value={link.label}
+                                                                        onChange={(e) => handleUpdateLink('mainMenuLinks', link.id, 'label', e.target.value)}
+                                                                        style={{ flex: 1, padding: '8px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--sn-border)', fontSize: '0.9rem' }}
+                                                                    />
+                                                                    <select
+                                                                        value={selectValue}
+                                                                        onChange={(e) => {
+                                                                            const val = e.target.value;
+                                                                            if (val === 'custom') {
+                                                                                handleUpdateLink('mainMenuLinks', link.id, 'url', '/');
+                                                                            } else {
+                                                                                handleUpdateLink('mainMenuLinks', link.id, 'url', val);
+                                                                            }
+                                                                        }}
+                                                                        style={{ flex: 1, padding: '8px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--sn-border)', fontSize: '0.9rem', backgroundColor: 'var(--sn-white)' }}
+                                                                    >
+                                                                        <option value="" disabled>Choisir une page...</option>
+                                                                        {predefinedPages.map(p => (
+                                                                            <option key={p.url} value={p.url}>{p.label}</option>
+                                                                        ))}
+                                                                        <option value="custom">Lien personnalisé...</option>
+                                                                    </select>
+                                                                    {isCustom && (
+                                                                        <input
+                                                                            type="text"
+                                                                            placeholder="URL (ex: /contact)"
+                                                                            value={link.url}
+                                                                            onChange={(e) => handleUpdateLink('mainMenuLinks', link.id, 'url', e.target.value)}
+                                                                            style={{ flex: 1, padding: '8px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--sn-border)', fontSize: '0.9rem' }}
+                                                                        />
+                                                                    )}
+                                                                    <button onClick={() => handleRemoveLink('mainMenuLinks', link.id)} style={{ background: 'none', border: 'none', color: 'var(--sn-error)', cursor: 'pointer', padding: '4px', marginLeft: 'auto' }} title="Supprimer le lien">
+                                                                        <Trash2 size={18} />
+                                                                    </button>
+                                                                </div>
+                                                            )
+                                                        })}
+                                                        {appearanceSettings.mainMenuLinks.length === 0 && (
+                                                            <p style={{ color: 'var(--sn-gray)', fontSize: '0.9rem', fontStyle: 'italic' }}>Aucun lien configuré.</p>
                                                         )}
                                                     </div>
-                                                    <label className="btn-secondary" style={{ display: 'block', textAlign: 'center', padding: '8px', cursor: 'pointer', fontSize: '0.9rem' }}>
-                                                        Changer l'image
-                                                        <input type="file" accept="image/*" hidden onChange={(e) => handleCoverUpload(e, 'homeCover')} />
-                                                    </label>
                                                 </div>
 
-                                                {/* Walks Cover */}
-                                                <div style={{ background: 'white', borderRadius: 'var(--radius-sm)', border: '1px solid var(--sn-border)', padding: 'var(--sp-4)' }}>
-                                                    <label style={{ display: 'block', fontSize: '0.95rem', fontWeight: 600, marginBottom: 'var(--sp-3)' }}>Page Randonnées</label>
-                                                    <div style={{ position: 'relative', height: '150px', background: '#f0f0f0', borderRadius: 'var(--radius-sm)', overflow: 'hidden', marginBottom: 'var(--sp-3)', border: '1px dashed var(--sn-border-dark)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                                        {appearanceSettings.walksCover ? (
-                                                            <img src={appearanceSettings.walksCover} alt="Walks Cover" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                                                        ) : (
-                                                            <div style={{ textAlign: 'center', color: 'var(--sn-gray)' }}>
-                                                                <UploadCloud size={32} style={{ margin: '0 auto var(--sp-2)' }} />
-                                                                <span style={{ fontSize: '0.85rem' }}>Aucune image</span>
-                                                            </div>
+                                                {/* Footer Links */}
+                                                <div>
+                                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--sp-4)' }}>
+                                                        <h4 style={{ fontSize: '1.05rem', color: 'var(--sn-gray-dark)', margin: 0 }}>Pied de page (Footer)</h4>
+                                                        <button onClick={() => handleAddLink('footerLinks')} className="btn-secondary" style={{ padding: '6px 12px', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                            <Plus size={14} /> Ajouter un lien
+                                                        </button>
+                                                    </div>
+                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--sp-3)' }}>
+                                                        {appearanceSettings.footerLinks.map((link, index) => {
+                                                            const isCustom = !predefinedPages.some(p => p.url === link.url) && link.url !== '';
+                                                            const selectValue = isCustom ? 'custom' : (link.url || '');
+                                                            return (
+                                                                <div key={link.id} style={{ display: 'flex', gap: 'var(--sp-2)', alignItems: 'center', background: 'white', padding: 'var(--sp-3)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--sn-border)' }}>
+                                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                                                        <button onClick={() => handleMoveLink('footerLinks', link.id, 'up')} disabled={index === 0} style={{ background: 'none', border: 'none', cursor: index === 0 ? 'default' : 'pointer', opacity: index === 0 ? 0.3 : 1, padding: '2px' }}>↑</button>
+                                                                        <button onClick={() => handleMoveLink('footerLinks', link.id, 'down')} disabled={index === appearanceSettings.footerLinks.length - 1} style={{ background: 'none', border: 'none', cursor: index === appearanceSettings.footerLinks.length - 1 ? 'default' : 'pointer', opacity: index === appearanceSettings.footerLinks.length - 1 ? 0.3 : 1, padding: '2px' }}>↓</button>
+                                                                    </div>
+                                                                    <input
+                                                                        type="text"
+                                                                        placeholder="Titre du lien"
+                                                                        value={link.label}
+                                                                        onChange={(e) => handleUpdateLink('footerLinks', link.id, 'label', e.target.value)}
+                                                                        style={{ flex: 1, padding: '8px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--sn-border)', fontSize: '0.9rem' }}
+                                                                    />
+                                                                    <select
+                                                                        value={selectValue}
+                                                                        onChange={(e) => {
+                                                                            const val = e.target.value;
+                                                                            if (val === 'custom') {
+                                                                                handleUpdateLink('footerLinks', link.id, 'url', '/');
+                                                                            } else {
+                                                                                handleUpdateLink('footerLinks', link.id, 'url', val);
+                                                                            }
+                                                                        }}
+                                                                        style={{ flex: 1, padding: '8px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--sn-border)', fontSize: '0.9rem', backgroundColor: 'var(--sn-white)' }}
+                                                                    >
+                                                                        <option value="" disabled>Choisir une page...</option>
+                                                                        {predefinedPages.map(p => (
+                                                                            <option key={p.url} value={p.url}>{p.label}</option>
+                                                                        ))}
+                                                                        <option value="custom">Lien personnalisé...</option>
+                                                                    </select>
+                                                                    {isCustom && (
+                                                                        <input
+                                                                            type="text"
+                                                                            placeholder="URL (ex: /contact)"
+                                                                            value={link.url}
+                                                                            onChange={(e) => handleUpdateLink('footerLinks', link.id, 'url', e.target.value)}
+                                                                            style={{ flex: 1, padding: '8px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--sn-border)', fontSize: '0.9rem' }}
+                                                                        />
+                                                                    )}
+                                                                    <button onClick={() => handleRemoveLink('footerLinks', link.id)} style={{ background: 'none', border: 'none', color: 'var(--sn-error)', cursor: 'pointer', padding: '4px', marginLeft: 'auto' }} title="Supprimer le lien">
+                                                                        <Trash2 size={18} />
+                                                                    </button>
+                                                                </div>
+                                                            )
+                                                        })}
+                                                        {appearanceSettings.footerLinks.length === 0 && (
+                                                            <p style={{ color: 'var(--sn-gray)', fontSize: '0.9rem', fontStyle: 'italic' }}>Aucun lien configuré.</p>
                                                         )}
                                                     </div>
-                                                    <label className="btn-secondary" style={{ display: 'block', textAlign: 'center', padding: '8px', cursor: 'pointer', fontSize: '0.9rem' }}>
-                                                        Changer l'image
-                                                        <input type="file" accept="image/*" hidden onChange={(e) => handleCoverUpload(e, 'walksCover')} />
-                                                    </label>
                                                 </div>
                                             </div>
-                                        </div>
-
-                                        <div style={{ display: 'grid', gap: 'var(--sp-8)' }}>
-                                            {/* Main Menu Links */}
-                                            <div>
-                                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--sp-4)' }}>
-                                                    <h4 style={{ fontSize: '1.05rem', color: 'var(--sn-gray-dark)', margin: 0 }}>Menu Principal</h4>
-                                                    <button onClick={() => handleAddLink('mainMenuLinks')} className="btn-secondary" style={{ padding: '6px 12px', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                                        <Plus size={14} /> Ajouter un lien
-                                                    </button>
-                                                </div>
-                                                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--sp-3)' }}>
-                                                    {appearanceSettings.mainMenuLinks.map((link) => (
-                                                        <div key={link.id} style={{ display: 'flex', gap: 'var(--sp-3)', alignItems: 'center', background: 'white', padding: 'var(--sp-3)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--sn-border)' }}>
-                                                            <input
-                                                                type="text"
-                                                                placeholder="Titre (ex: Accueil)"
-                                                                value={link.label}
-                                                                onChange={(e) => handleUpdateLink('mainMenuLinks', link.id, 'label', e.target.value)}
-                                                                style={{ flex: 1, padding: '8px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--sn-border)', fontSize: '0.9rem' }}
-                                                            />
-                                                            <input
-                                                                type="text"
-                                                                placeholder="URL (ex: /)"
-                                                                value={link.url}
-                                                                onChange={(e) => handleUpdateLink('mainMenuLinks', link.id, 'url', e.target.value)}
-                                                                style={{ flex: 2, padding: '8px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--sn-border)', fontSize: '0.9rem' }}
-                                                            />
-                                                            <button onClick={() => handleRemoveLink('mainMenuLinks', link.id)} style={{ background: 'none', border: 'none', color: 'var(--sn-error)', cursor: 'pointer', padding: '4px' }} title="Supprimer le lien">
-                                                                <Trash2 size={18} />
-                                                            </button>
-                                                        </div>
-                                                    ))}
-                                                    {appearanceSettings.mainMenuLinks.length === 0 && (
-                                                        <p style={{ color: 'var(--sn-gray)', fontSize: '0.9rem', fontStyle: 'italic' }}>Aucun lien configuré.</p>
-                                                    )}
-                                                </div>
-                                            </div>
-
-                                            {/* Footer Links */}
-                                            <div>
-                                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--sp-4)' }}>
-                                                    <h4 style={{ fontSize: '1.05rem', color: 'var(--sn-gray-dark)', margin: 0 }}>Pied de page (Footer)</h4>
-                                                    <button onClick={() => handleAddLink('footerLinks')} className="btn-secondary" style={{ padding: '6px 12px', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                                        <Plus size={14} /> Ajouter un lien
-                                                    </button>
-                                                </div>
-                                                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--sp-3)' }}>
-                                                    {appearanceSettings.footerLinks.map((link) => (
-                                                        <div key={link.id} style={{ display: 'flex', gap: 'var(--sp-3)', alignItems: 'center', background: 'white', padding: 'var(--sp-3)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--sn-border)' }}>
-                                                            <input
-                                                                type="text"
-                                                                placeholder="Titre (ex: Contact)"
-                                                                value={link.label}
-                                                                onChange={(e) => handleUpdateLink('footerLinks', link.id, 'label', e.target.value)}
-                                                                style={{ flex: 1, padding: '8px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--sn-border)', fontSize: '0.9rem' }}
-                                                            />
-                                                            <input
-                                                                type="text"
-                                                                placeholder="URL (ex: /contact)"
-                                                                value={link.url}
-                                                                onChange={(e) => handleUpdateLink('footerLinks', link.id, 'url', e.target.value)}
-                                                                style={{ flex: 2, padding: '8px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--sn-border)', fontSize: '0.9rem' }}
-                                                            />
-                                                            <button onClick={() => handleRemoveLink('footerLinks', link.id)} style={{ background: 'none', border: 'none', color: 'var(--sn-error)', cursor: 'pointer', padding: '4px' }} title="Supprimer le lien">
-                                                                <Trash2 size={18} />
-                                                            </button>
-                                                        </div>
-                                                    ))}
-                                                    {appearanceSettings.footerLinks.length === 0 && (
-                                                        <p style={{ color: 'var(--sn-gray)', fontSize: '0.9rem', fontStyle: 'italic' }}>Aucun lien configuré.</p>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </section>
+                                        </section>
+                                    )}
 
                                     {/* Paramètres Généraux */}
-                                    <section>
-                                        <h3 style={{ fontSize: '1rem', color: 'var(--sn-black)', marginBottom: 'var(--sp-4)', borderBottom: '1px solid var(--sn-border)', paddingBottom: 'var(--sp-2)' }}>Paramètres Généraux</h3>
-                                        <div style={{ display: 'grid', gap: 'var(--sp-4)' }}>
-                                            <div>
-                                                <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: 500, marginBottom: 'var(--sp-2)' }}>Nom du site</label>
-                                                <input type="text" value={appearanceSettings.siteName || ''} onChange={(e) => handleSettingChange('siteName', e.target.value)} style={{ width: '100%', padding: '10px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--sn-border)', fontSize: '0.95rem' }} />
+                                    {settingsTab === 'general' && (
+                                        <section>
+                                            <h3 style={{ fontSize: '1rem', color: 'var(--sn-black)', marginBottom: 'var(--sp-4)', borderBottom: '1px solid var(--sn-border)', paddingBottom: 'var(--sp-2)' }}>Paramètres Généraux</h3>
+                                            <div style={{ display: 'grid', gap: 'var(--sp-4)' }}>
+                                                <div>
+                                                    <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: 500, marginBottom: 'var(--sp-2)' }}>Nom du site</label>
+                                                    <input type="text" value={appearanceSettings.siteName || ''} onChange={(e) => handleSettingChange('siteName', e.target.value)} style={{ width: '100%', padding: '10px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--sn-border)', fontSize: '0.95rem' }} />
+                                                </div>
+                                                <div>
+                                                    <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: 500, marginBottom: 'var(--sp-2)' }}>Email de contact (Support)</label>
+                                                    <input type="email" value={appearanceSettings.contactEmail || ''} onChange={(e) => handleSettingChange('contactEmail', e.target.value)} style={{ width: '100%', padding: '10px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--sn-border)', fontSize: '0.95rem' }} />
+                                                </div>
                                             </div>
-                                            <div>
-                                                <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: 500, marginBottom: 'var(--sp-2)' }}>Email de contact (Support)</label>
-                                                <input type="email" value={appearanceSettings.contactEmail || ''} onChange={(e) => handleSettingChange('contactEmail', e.target.value)} style={{ width: '100%', padding: '10px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--sn-border)', fontSize: '0.95rem' }} />
-                                            </div>
-                                        </div>
-                                    </section>
+                                        </section>
+                                    )}
 
                                     {/* Tarification - Photos Numériques */}
-                                    <section style={{ background: '#f8fafc', padding: 'var(--sp-6)', borderRadius: 'var(--radius-md)', border: '1px solid var(--sn-border-light)' }}>
-                                        <h3 style={{ fontSize: '1.1rem', color: 'var(--sn-black)', marginBottom: 'var(--sp-5)', borderBottom: '2px solid var(--sn-sand-pale)', paddingBottom: 'var(--sp-3)', display: 'inline-block' }}>
-                                            Tarification - Photos Numériques
-                                        </h3>
+                                    {settingsTab === 'pricing' && (
+                                        <React.Fragment>
+                                            <section style={{ background: '#f8fafc', padding: 'var(--sp-6)', borderRadius: 'var(--radius-md)', border: '1px solid var(--sn-border-light)' }}>
+                                                <h3 style={{ fontSize: '1.1rem', color: 'var(--sn-black)', marginBottom: 'var(--sp-5)', borderBottom: '2px solid var(--sn-sand-pale)', paddingBottom: 'var(--sp-3)', display: 'inline-block' }}>
+                                                    Tarification - Photos Numériques
+                                                </h3>
 
-                                        <h4 style={{ fontSize: '0.95rem', fontWeight: 600, marginBottom: 'var(--sp-4)', color: 'var(--sn-gray-dark)' }}>Prix de base selon le format (FCFA)</h4>
-                                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 'var(--sp-5)', marginBottom: 'var(--sp-6)' }}>
-                                            <div style={{ background: 'white', padding: 'var(--sp-4)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--sn-border)' }}>
-                                                <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: 600, marginBottom: 'var(--sp-2)' }}>Web / Basse Résolution</label>
-                                                <p style={{ fontSize: '0.8rem', color: 'var(--sn-gray)', marginBottom: 'var(--sp-3)', lineHeight: 1.3 }}>Réseaux sociaux, blogs personnels (1080px).</p>
-                                                <input type="number" value={appearanceSettings.pricingDigitalWeb || 0} onChange={(e) => handleSettingChange('pricingDigitalWeb', Number(e.target.value))} style={{ width: '100%', padding: '10px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--sn-border)', fontSize: '0.95rem', background: '#f9fafb' }} />
-                                            </div>
-                                            <div style={{ background: 'white', padding: 'var(--sp-4)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--sn-border)' }}>
-                                                <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: 600, marginBottom: 'var(--sp-2)' }}>Impression Haute Résolution</label>
-                                                <p style={{ fontSize: '0.8rem', color: 'var(--sn-gray)', marginBottom: 'var(--sp-3)', lineHeight: 1.3 }}>Pour tirage personnel, qualité originale finale.</p>
-                                                <input type="number" value={appearanceSettings.pricingDigitalPrint || 0} onChange={(e) => handleSettingChange('pricingDigitalPrint', Number(e.target.value))} style={{ width: '100%', padding: '10px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--sn-border)', fontSize: '0.95rem', background: '#f9fafb' }} />
-                                            </div>
-                                            <div style={{ background: 'white', padding: 'var(--sp-4)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--sn-border)' }}>
-                                                <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: 600, marginBottom: 'var(--sp-2)' }}>Licence Commerciale</label>
-                                                <p style={{ fontSize: '0.8rem', color: 'var(--sn-gray)', marginBottom: 'var(--sp-3)', lineHeight: 1.3 }}>Utilisation publicitaire, magazines, marques.</p>
-                                                <input type="number" value={appearanceSettings.pricingDigitalCommercial || 0} onChange={(e) => handleSettingChange('pricingDigitalCommercial', Number(e.target.value))} style={{ width: '100%', padding: '10px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--sn-border)', fontSize: '0.95rem', background: '#f9fafb' }} />
-                                            </div>
-                                        </div>
+                                                <h4 style={{ fontSize: '0.95rem', fontWeight: 600, marginBottom: 'var(--sp-4)', color: 'var(--sn-gray-dark)' }}>Prix de base selon le format (FCFA)</h4>
+                                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 'var(--sp-5)', marginBottom: 'var(--sp-6)' }}>
+                                                    <div style={{ background: 'white', padding: 'var(--sp-4)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--sn-border)' }}>
+                                                        <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: 600, marginBottom: 'var(--sp-2)' }}>Web / Basse Résolution</label>
+                                                        <p style={{ fontSize: '0.8rem', color: 'var(--sn-gray)', marginBottom: 'var(--sp-3)', lineHeight: 1.3 }}>Réseaux sociaux, blogs personnels (1080px).</p>
+                                                        <input type="number" value={appearanceSettings.pricingDigitalWeb || 0} onChange={(e) => handleSettingChange('pricingDigitalWeb', Number(e.target.value))} style={{ width: '100%', padding: '10px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--sn-border)', fontSize: '0.95rem', background: '#f9fafb' }} />
+                                                    </div>
+                                                    <div style={{ background: 'white', padding: 'var(--sp-4)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--sn-border)' }}>
+                                                        <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: 600, marginBottom: 'var(--sp-2)' }}>Impression Haute Résolution</label>
+                                                        <p style={{ fontSize: '0.8rem', color: 'var(--sn-gray)', marginBottom: 'var(--sp-3)', lineHeight: 1.3 }}>Pour tirage personnel, qualité originale finale.</p>
+                                                        <input type="number" value={appearanceSettings.pricingDigitalPrint || 0} onChange={(e) => handleSettingChange('pricingDigitalPrint', Number(e.target.value))} style={{ width: '100%', padding: '10px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--sn-border)', fontSize: '0.95rem', background: '#f9fafb' }} />
+                                                    </div>
+                                                    <div style={{ background: 'white', padding: 'var(--sp-4)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--sn-border)' }}>
+                                                        <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: 600, marginBottom: 'var(--sp-2)' }}>Licence Commerciale</label>
+                                                        <p style={{ fontSize: '0.8rem', color: 'var(--sn-gray)', marginBottom: 'var(--sp-3)', lineHeight: 1.3 }}>Utilisation publicitaire, magazines, marques.</p>
+                                                        <input type="number" value={appearanceSettings.pricingDigitalCommercial || 0} onChange={(e) => handleSettingChange('pricingDigitalCommercial', Number(e.target.value))} style={{ width: '100%', padding: '10px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--sn-border)', fontSize: '0.95rem', background: '#f9fafb' }} />
+                                                    </div>
+                                                </div>
 
-                                        <h4 style={{ fontSize: '0.95rem', fontWeight: 600, marginBottom: 'var(--sp-4)', color: 'var(--sn-gray-dark)' }}>Répartition des revenus (Numérique)</h4>
-                                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: 'var(--sp-5)' }}>
-                                            <div style={{ background: 'white', padding: 'var(--sp-4)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--sn-border)' }}>
-                                                <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: 600, marginBottom: 'var(--sp-2)' }}>Part Photographe (%)</label>
-                                                <input type="number" value={appearanceSettings.revenueShareDigitalPhoto || 0} onChange={(e) => handleSettingChange('revenueShareDigitalPhoto', Number(e.target.value))} style={{ width: '100%', padding: '10px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--sn-border)', fontSize: '0.95rem' }} />
-                                            </div>
-                                            <div style={{ background: 'white', padding: 'var(--sp-4)', borderRadius: 'var(--radius-sm)', border: '1px solid rgba(0,0,0,0.05)' }}>
-                                                <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: 600, marginBottom: 'var(--sp-2)', color: 'var(--sn-gray)' }}>Frais de Plateforme (%)</label>
-                                                <input type="number" value={100 - (appearanceSettings.revenueShareDigitalPhoto || 0)} disabled style={{ width: '100%', padding: '10px', borderRadius: 'var(--radius-sm)', border: '1px solid transparent', fontSize: '0.95rem', background: '#f1f5f9', color: 'var(--sn-gray)' }} />
-                                            </div>
-                                        </div>
-                                    </section>
+                                                <h4 style={{ fontSize: '0.95rem', fontWeight: 600, marginBottom: 'var(--sp-4)', color: 'var(--sn-gray-dark)' }}>Répartition des revenus (Numérique)</h4>
+                                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: 'var(--sp-5)' }}>
+                                                    <div style={{ background: 'white', padding: 'var(--sp-4)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--sn-border)' }}>
+                                                        <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: 600, marginBottom: 'var(--sp-2)' }}>Part Photographe (%)</label>
+                                                        <input type="number" value={appearanceSettings.revenueShareDigitalPhoto || 0} onChange={(e) => handleSettingChange('revenueShareDigitalPhoto', Number(e.target.value))} style={{ width: '100%', padding: '10px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--sn-border)', fontSize: '0.95rem' }} />
+                                                    </div>
+                                                    <div style={{ background: 'white', padding: 'var(--sp-4)', borderRadius: 'var(--radius-sm)', border: '1px solid rgba(0,0,0,0.05)' }}>
+                                                        <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: 600, marginBottom: 'var(--sp-2)', color: 'var(--sn-gray)' }}>Frais de Plateforme (%)</label>
+                                                        <input type="number" value={100 - (appearanceSettings.revenueShareDigitalPhoto || 0)} disabled style={{ width: '100%', padding: '10px', borderRadius: 'var(--radius-sm)', border: '1px solid transparent', fontSize: '0.95rem', background: '#f1f5f9', color: 'var(--sn-gray)' }} />
+                                                    </div>
+                                                </div>
+                                            </section>
 
-                                    {/* Tarification - Tirages (Prints) */}
-                                    <section style={{ background: '#f8fafc', padding: 'var(--sp-6)', borderRadius: 'var(--radius-md)', border: '1px solid var(--sn-border-light)' }}>
-                                        <h3 style={{ fontSize: '1.1rem', color: 'var(--sn-black)', marginBottom: 'var(--sp-5)', borderBottom: '2px solid var(--sn-sand-pale)', paddingBottom: 'var(--sp-3)', display: 'inline-block' }}>
-                                            Tarification - Tirages Physiques (Prints)
-                                        </h3>
+                                            {/* Tarification - Tirages (Prints) */}
+                                            <section style={{ background: '#f8fafc', padding: 'var(--sp-6)', borderRadius: 'var(--radius-md)', border: '1px solid var(--sn-border-light)' }}>
+                                                <h3 style={{ fontSize: '1.1rem', color: 'var(--sn-black)', marginBottom: 'var(--sp-5)', borderBottom: '2px solid var(--sn-sand-pale)', paddingBottom: 'var(--sp-3)', display: 'inline-block' }}>
+                                                    Tarification - Tirages Physiques (Prints)
+                                                </h3>
 
-                                        <h4 style={{ fontSize: '0.95rem', fontWeight: 600, marginBottom: 'var(--sp-4)', color: 'var(--sn-gray-dark)' }}>Tailles et Prix de base (FCFA)</h4>
-                                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 'var(--sp-5)', marginBottom: 'var(--sp-8)' }}>
-                                            <div style={{ background: 'white', padding: 'var(--sp-4)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--sn-border)' }}>
-                                                <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: 600, marginBottom: 'var(--sp-2)' }}>Petit Format</label>
-                                                <p style={{ fontSize: '0.8rem', color: 'var(--sn-gray)', marginBottom: 'var(--sp-3)', lineHeight: 1.3 }}>A4 / 20x30 cm.</p>
-                                                <input type="number" value={appearanceSettings.pricingPrintSmall || 0} onChange={(e) => handleSettingChange('pricingPrintSmall', Number(e.target.value))} style={{ width: '100%', padding: '10px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--sn-border)', background: '#f9fafb' }} />
-                                            </div>
-                                            <div style={{ background: 'white', padding: 'var(--sp-4)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--sn-border)' }}>
-                                                <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: 600, marginBottom: 'var(--sp-2)' }}>Moyen Format</label>
-                                                <p style={{ fontSize: '0.8rem', color: 'var(--sn-gray)', marginBottom: 'var(--sp-3)', lineHeight: 1.3 }}>A3 / 30x45 cm.</p>
-                                                <input type="number" value={appearanceSettings.pricingPrintMedium || 0} onChange={(e) => handleSettingChange('pricingPrintMedium', Number(e.target.value))} style={{ width: '100%', padding: '10px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--sn-border)', background: '#f9fafb' }} />
-                                            </div>
-                                            <div style={{ background: 'white', padding: 'var(--sp-4)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--sn-border)' }}>
-                                                <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: 600, marginBottom: 'var(--sp-2)' }}>Grand Format</label>
-                                                <p style={{ fontSize: '0.8rem', color: 'var(--sn-gray)', marginBottom: 'var(--sp-3)', lineHeight: 1.3 }}>A2 / 40x60 cm.</p>
-                                                <input type="number" value={appearanceSettings.pricingPrintLarge || 0} onChange={(e) => handleSettingChange('pricingPrintLarge', Number(e.target.value))} style={{ width: '100%', padding: '10px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--sn-border)', background: '#f9fafb' }} />
-                                            </div>
-                                        </div>
+                                                <h4 style={{ fontSize: '0.95rem', fontWeight: 600, marginBottom: 'var(--sp-4)', color: 'var(--sn-gray-dark)' }}>Tailles et Prix de base (FCFA)</h4>
+                                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 'var(--sp-5)', marginBottom: 'var(--sp-8)' }}>
+                                                    <div style={{ background: 'white', padding: 'var(--sp-4)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--sn-border)' }}>
+                                                        <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: 600, marginBottom: 'var(--sp-2)' }}>Petit Format</label>
+                                                        <p style={{ fontSize: '0.8rem', color: 'var(--sn-gray)', marginBottom: 'var(--sp-3)', lineHeight: 1.3 }}>A4 / 20x30 cm.</p>
+                                                        <input type="number" value={appearanceSettings.pricingPrintSmall || 0} onChange={(e) => handleSettingChange('pricingPrintSmall', Number(e.target.value))} style={{ width: '100%', padding: '10px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--sn-border)', background: '#f9fafb' }} />
+                                                    </div>
+                                                    <div style={{ background: 'white', padding: 'var(--sp-4)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--sn-border)' }}>
+                                                        <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: 600, marginBottom: 'var(--sp-2)' }}>Moyen Format</label>
+                                                        <p style={{ fontSize: '0.8rem', color: 'var(--sn-gray)', marginBottom: 'var(--sp-3)', lineHeight: 1.3 }}>A3 / 30x45 cm.</p>
+                                                        <input type="number" value={appearanceSettings.pricingPrintMedium || 0} onChange={(e) => handleSettingChange('pricingPrintMedium', Number(e.target.value))} style={{ width: '100%', padding: '10px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--sn-border)', background: '#f9fafb' }} />
+                                                    </div>
+                                                    <div style={{ background: 'white', padding: 'var(--sp-4)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--sn-border)' }}>
+                                                        <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: 600, marginBottom: 'var(--sp-2)' }}>Grand Format</label>
+                                                        <p style={{ fontSize: '0.8rem', color: 'var(--sn-gray)', marginBottom: 'var(--sp-3)', lineHeight: 1.3 }}>A2 / 40x60 cm.</p>
+                                                        <input type="number" value={appearanceSettings.pricingPrintLarge || 0} onChange={(e) => handleSettingChange('pricingPrintLarge', Number(e.target.value))} style={{ width: '100%', padding: '10px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--sn-border)', background: '#f9fafb' }} />
+                                                    </div>
+                                                </div>
 
-                                        <h4 style={{ fontSize: '0.95rem', fontWeight: 600, marginBottom: 'var(--sp-4)', color: 'var(--sn-gray-dark)' }}>Options d'encadrement (Surcoût en FCFA)</h4>
-                                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 'var(--sp-5)', marginBottom: 'var(--sp-8)' }}>
-                                            <div style={{ background: 'white', padding: 'var(--sp-4)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--sn-border)' }}>
-                                                <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: 600, marginBottom: 'var(--sp-2)' }}>Cadre Standard</label>
-                                                <p style={{ fontSize: '0.8rem', color: 'var(--sn-gray)', marginBottom: 'var(--sp-3)', lineHeight: 1.3 }}>Simple noir ou blanc.</p>
-                                                <input type="number" value={appearanceSettings.pricingFrameStandard || 0} onChange={(e) => handleSettingChange('pricingFrameStandard', Number(e.target.value))} style={{ width: '100%', padding: '10px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--sn-border)', background: '#f9fafb' }} />
-                                            </div>
-                                            <div style={{ background: 'white', padding: 'var(--sp-4)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--sn-border)' }}>
-                                                <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: 600, marginBottom: 'var(--sp-2)' }}>Cadre Premium</label>
-                                                <p style={{ fontSize: '0.8rem', color: 'var(--sn-gray)', marginBottom: 'var(--sp-3)', lineHeight: 1.3 }}>Bois massif ou métal brossé.</p>
-                                                <input type="number" value={appearanceSettings.pricingFramePremium || 0} onChange={(e) => handleSettingChange('pricingFramePremium', Number(e.target.value))} style={{ width: '100%', padding: '10px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--sn-border)', background: '#f9fafb' }} />
-                                            </div>
-                                            <div style={{ background: 'white', padding: 'var(--sp-4)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--sn-border)' }}>
-                                                <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: 600, marginBottom: 'var(--sp-2)' }}>Passe-partout</label>
-                                                <p style={{ fontSize: '0.8rem', color: 'var(--sn-gray)', marginBottom: 'var(--sp-3)', lineHeight: 1.3 }}>Marge blanche de protection.</p>
-                                                <input type="number" value={appearanceSettings.pricingPassePartout || 0} onChange={(e) => handleSettingChange('pricingPassePartout', Number(e.target.value))} style={{ width: '100%', padding: '10px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--sn-border)', background: '#f9fafb' }} />
-                                            </div>
-                                        </div>
+                                                <h4 style={{ fontSize: '0.95rem', fontWeight: 600, marginBottom: 'var(--sp-4)', color: 'var(--sn-gray-dark)' }}>Options d'encadrement (Surcoût en FCFA)</h4>
+                                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 'var(--sp-5)', marginBottom: 'var(--sp-8)' }}>
+                                                    <div style={{ background: 'white', padding: 'var(--sp-4)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--sn-border)' }}>
+                                                        <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: 600, marginBottom: 'var(--sp-2)' }}>Cadre Standard</label>
+                                                        <p style={{ fontSize: '0.8rem', color: 'var(--sn-gray)', marginBottom: 'var(--sp-3)', lineHeight: 1.3 }}>Simple noir ou blanc.</p>
+                                                        <input type="number" value={appearanceSettings.pricingFrameStandard || 0} onChange={(e) => handleSettingChange('pricingFrameStandard', Number(e.target.value))} style={{ width: '100%', padding: '10px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--sn-border)', background: '#f9fafb' }} />
+                                                    </div>
+                                                    <div style={{ background: 'white', padding: 'var(--sp-4)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--sn-border)' }}>
+                                                        <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: 600, marginBottom: 'var(--sp-2)' }}>Cadre Premium</label>
+                                                        <p style={{ fontSize: '0.8rem', color: 'var(--sn-gray)', marginBottom: 'var(--sp-3)', lineHeight: 1.3 }}>Bois massif ou métal brossé.</p>
+                                                        <input type="number" value={appearanceSettings.pricingFramePremium || 0} onChange={(e) => handleSettingChange('pricingFramePremium', Number(e.target.value))} style={{ width: '100%', padding: '10px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--sn-border)', background: '#f9fafb' }} />
+                                                    </div>
+                                                    <div style={{ background: 'white', padding: 'var(--sp-4)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--sn-border)' }}>
+                                                        <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: 600, marginBottom: 'var(--sp-2)' }}>Passe-partout</label>
+                                                        <p style={{ fontSize: '0.8rem', color: 'var(--sn-gray)', marginBottom: 'var(--sp-3)', lineHeight: 1.3 }}>Marge blanche de protection.</p>
+                                                        <input type="number" value={appearanceSettings.pricingPassePartout || 0} onChange={(e) => handleSettingChange('pricingPassePartout', Number(e.target.value))} style={{ width: '100%', padding: '10px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--sn-border)', background: '#f9fafb' }} />
+                                                    </div>
+                                                </div>
 
-                                        <h4 style={{ fontSize: '0.95rem', fontWeight: 600, marginBottom: 'var(--sp-4)', color: 'var(--sn-gray-dark)' }}>Répartition des revenus (Tirages nets)</h4>
-                                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: 'var(--sp-5)' }}>
-                                            <div style={{ background: 'white', padding: 'var(--sp-4)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--sn-border)' }}>
-                                                <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: 600, marginBottom: 'var(--sp-2)' }}>Frais Imprimeur & Logistique (%)</label>
-                                                <p style={{ fontSize: '0.8rem', color: 'var(--sn-gray)', marginBottom: 'var(--sp-3)', lineHeight: 1.3 }}>Déduction estimée avant partage.</p>
-                                                <input type="number" value={appearanceSettings.revenueSharePrintPrinter || 0} onChange={(e) => handleSettingChange('revenueSharePrintPrinter', Number(e.target.value))} style={{ width: '100%', padding: '10px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--sn-border)' }} />
-                                            </div>
-                                            <div style={{ background: 'white', padding: 'var(--sp-4)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--sn-border)' }}>
-                                                <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: 600, marginBottom: 'var(--sp-2)' }}>Part Photographe (%)</label>
-                                                <p style={{ fontSize: '0.8rem', color: 'var(--sn-gray)', marginBottom: 'var(--sp-3)', lineHeight: 1.3 }}>Sur le bénéfice net de la vente.</p>
-                                                <input type="number" value={appearanceSettings.revenueSharePrintPhoto || 0} onChange={(e) => handleSettingChange('revenueSharePrintPhoto', Number(e.target.value))} style={{ width: '100%', padding: '10px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--sn-border)' }} />
-                                            </div>
-                                            <div style={{ background: 'white', padding: 'var(--sp-4)', borderRadius: 'var(--radius-sm)', border: '1px solid rgba(0,0,0,0.05)' }}>
-                                                <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: 600, marginBottom: 'var(--sp-2)', color: 'var(--sn-gray)' }}>Part Plateforme (%)</label>
-                                                <p style={{ fontSize: '0.8rem', color: 'var(--sn-gray)', marginBottom: 'var(--sp-3)', lineHeight: 1.3 }}>Restant alloué à la plateforme.</p>
-                                                <input type="number" value={100 - (appearanceSettings.revenueSharePrintPrinter || 0) - (appearanceSettings.revenueSharePrintPhoto || 0)} disabled style={{ width: '100%', padding: '10px', borderRadius: 'var(--radius-sm)', border: '1px solid transparent', background: '#f1f5f9', color: 'var(--sn-gray)' }} />
-                                            </div>
-                                        </div>
-                                    </section>
+                                                <h4 style={{ fontSize: '0.95rem', fontWeight: 600, marginBottom: 'var(--sp-4)', color: 'var(--sn-gray-dark)' }}>Répartition des revenus (Tirages nets)</h4>
+                                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: 'var(--sp-5)' }}>
+                                                    <div style={{ background: 'white', padding: 'var(--sp-4)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--sn-border)' }}>
+                                                        <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: 600, marginBottom: 'var(--sp-2)' }}>Frais Imprimeur & Logistique (%)</label>
+                                                        <p style={{ fontSize: '0.8rem', color: 'var(--sn-gray)', marginBottom: 'var(--sp-3)', lineHeight: 1.3 }}>Déduction estimée avant partage.</p>
+                                                        <input type="number" value={appearanceSettings.revenueSharePrintPrinter || 0} onChange={(e) => handleSettingChange('revenueSharePrintPrinter', Number(e.target.value))} style={{ width: '100%', padding: '10px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--sn-border)' }} />
+                                                    </div>
+                                                    <div style={{ background: 'white', padding: 'var(--sp-4)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--sn-border)' }}>
+                                                        <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: 600, marginBottom: 'var(--sp-2)' }}>Part Photographe (%)</label>
+                                                        <p style={{ fontSize: '0.8rem', color: 'var(--sn-gray)', marginBottom: 'var(--sp-3)', lineHeight: 1.3 }}>Sur le bénéfice net de la vente.</p>
+                                                        <input type="number" value={appearanceSettings.revenueSharePrintPhoto || 0} onChange={(e) => handleSettingChange('revenueSharePrintPhoto', Number(e.target.value))} style={{ width: '100%', padding: '10px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--sn-border)' }} />
+                                                    </div>
+                                                    <div style={{ background: 'white', padding: 'var(--sp-4)', borderRadius: 'var(--radius-sm)', border: '1px solid rgba(0,0,0,0.05)' }}>
+                                                        <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: 600, marginBottom: 'var(--sp-2)', color: 'var(--sn-gray)' }}>Part Plateforme (%)</label>
+                                                        <p style={{ fontSize: '0.8rem', color: 'var(--sn-gray)', marginBottom: 'var(--sp-3)', lineHeight: 1.3 }}>Restant alloué à la plateforme.</p>
+                                                        <input type="number" value={100 - (appearanceSettings.revenueSharePrintPrinter || 0) - (appearanceSettings.revenueSharePrintPhoto || 0)} disabled style={{ width: '100%', padding: '10px', borderRadius: 'var(--radius-sm)', border: '1px solid transparent', background: '#f1f5f9', color: 'var(--sn-gray)' }} />
+                                                    </div>
+                                                </div>
+                                            </section>
+                                        </React.Fragment>
+                                    )}
 
                                     {/* Paiements */}
-                                    <section>
-                                        <h3 style={{ fontSize: '1rem', color: 'var(--sn-black)', marginBottom: 'var(--sp-4)', borderBottom: '1px solid var(--sn-border)', paddingBottom: 'var(--sp-2)' }}>Passerelles de Paiement</h3>
-                                        <div style={{ display: 'grid', gap: 'var(--sp-4)' }}>
-                                            <div>
-                                                <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: 500, marginBottom: 'var(--sp-2)' }}>Clé API Publique PayDunya (Test)</label>
-                                                <input type="text" defaultValue="pk_test_xxxxxxxxxxxxxxxxx" style={{ width: '100%', padding: '10px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--sn-border)', fontSize: '0.95rem', fontFamily: 'monospace' }} />
+                                    {settingsTab === 'payments' && (
+                                        <section>
+                                            <h3 style={{ fontSize: '1rem', color: 'var(--sn-black)', marginBottom: 'var(--sp-4)', borderBottom: '1px solid var(--sn-border)', paddingBottom: 'var(--sp-2)' }}>Passerelles de Paiement</h3>
+                                            <div style={{ display: 'grid', gap: 'var(--sp-4)' }}>
+                                                <div>
+                                                    <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: 500, marginBottom: 'var(--sp-2)' }}>Clé API Publique PayDunya (Test)</label>
+                                                    <input type="text" defaultValue="pk_test_xxxxxxxxxxxxxxxxx" style={{ width: '100%', padding: '10px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--sn-border)', fontSize: '0.95rem', fontFamily: 'monospace' }} />
+                                                </div>
+                                                <div>
+                                                    <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: 500, marginBottom: 'var(--sp-2)' }}>Clé API Publique Stripe (Test)</label>
+                                                    <input type="text" defaultValue="pk_test_51xxxxxxxxxxxxxxx" style={{ width: '100%', padding: '10px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--sn-border)', fontSize: '0.95rem', fontFamily: 'monospace' }} />
+                                                </div>
                                             </div>
-                                            <div>
-                                                <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: 500, marginBottom: 'var(--sp-2)' }}>Clé API Publique Stripe (Test)</label>
-                                                <input type="text" defaultValue="pk_test_51xxxxxxxxxxxxxxx" style={{ width: '100%', padding: '10px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--sn-border)', fontSize: '0.95rem', fontFamily: 'monospace' }} />
+                                        </section>
+                                    )}
+
+                                    {/* Emails & SMTP */}
+                                    {settingsTab === 'smtp' && (
+                                        <section>
+                                            <h3 style={{ fontSize: '1rem', color: 'var(--sn-black)', marginBottom: 'var(--sp-4)', borderBottom: '1px solid var(--sn-border)', paddingBottom: 'var(--sp-2)' }}>Configuration Email & SMTP</h3>
+                                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: 'var(--sp-4)' }}>
+                                                <div>
+                                                    <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: 500, marginBottom: 'var(--sp-2)' }}>Serveur SMTP (Host)</label>
+                                                    <input type="text" value={appearanceSettings.smtpHost || ''} onChange={(e) => handleSettingChange('smtpHost', e.target.value)} placeholder="mail.votredomaine.com" style={{ width: '100%', padding: '10px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--sn-border)', fontSize: '0.95rem' }} />
+                                                </div>
+                                                <div>
+                                                    <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: 500, marginBottom: 'var(--sp-2)' }}>Port SMTP</label>
+                                                    <input type="text" value={appearanceSettings.smtpPort || ''} onChange={(e) => handleSettingChange('smtpPort', e.target.value)} placeholder="465 ou 587" style={{ width: '100%', padding: '10px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--sn-border)', fontSize: '0.95rem' }} />
+                                                </div>
+                                                <div>
+                                                    <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: 500, marginBottom: 'var(--sp-2)' }}>Utilisateur SMTP</label>
+                                                    <input type="text" value={appearanceSettings.smtpUser || ''} onChange={(e) => handleSettingChange('smtpUser', e.target.value)} placeholder="contact@votredomaine.com" style={{ width: '100%', padding: '10px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--sn-border)', fontSize: '0.95rem' }} />
+                                                </div>
+                                                <div>
+                                                    <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: 500, marginBottom: 'var(--sp-2)' }}>Mot de passe SMTP</label>
+                                                    <input type="password" value={appearanceSettings.smtpPassword || ''} onChange={(e) => handleSettingChange('smtpPassword', e.target.value)} placeholder="********" style={{ width: '100%', padding: '10px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--sn-border)', fontSize: '0.95rem' }} />
+                                                </div>
                                             </div>
-                                        </div>
-                                    </section>
+                                        </section>
+                                    )}
 
                                     <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 'var(--sp-4)' }}>
                                         <button className="btn-primary" onClick={async () => {
@@ -1092,6 +1529,134 @@ export default function AdminDashboard() {
                     </div>
                 )}
             </div>
+            {/* Image Edit Modal */}
+            {isImageModalOpen && (
+                <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000 }}>
+                    <div style={{ background: 'white', padding: 'var(--sp-8)', borderRadius: 'var(--radius-md)', width: '100%', maxWidth: '500px', boxShadow: 'var(--shadow-xl)' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--sp-6)' }}>
+                            <h2 style={{ fontSize: '1.5rem', margin: 0 }}>Modifier l'image</h2>
+                            <button onClick={() => setIsImageModalOpen(false)} style={{ color: 'var(--sn-gray)', background: 'none', border: 'none', cursor: 'pointer' }}><X /></button>
+                        </div>
+                        <form onSubmit={handleSaveImageEdit} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--sp-4)' }}>
+                            <div style={{ textAlign: 'center', marginBottom: 'var(--sp-4)' }}>
+                                <img src={editingImage?.url} alt="" style={{ maxHeight: '150px', borderRadius: '4px', margin: '0 auto' }} />
+                                {editingImage?.source === 'walk' && (
+                                    <p style={{ fontSize: '0.75rem', color: 'var(--sn-gray)', marginTop: '4px' }}>Source: Randonnée "{editingImage.walkTitle}"</p>
+                                )}
+                            </div>
+                            <div>
+                                <label style={{ display: 'block', fontSize: '0.9rem', marginBottom: 'var(--sp-2)', fontWeight: 500 }}>Titre de l'image</label>
+                                <input
+                                    type="text"
+                                    value={imageFormData.title}
+                                    onChange={(e) => setImageFormData({ ...imageFormData, title: e.target.value })}
+                                    style={{ width: '100%', padding: '10px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--sn-border)' }}
+                                    required
+                                />
+                            </div>
+                            <div>
+                                <label style={{ display: 'block', fontSize: '0.9rem', marginBottom: 'var(--sp-2)', fontWeight: 500 }}>Photographe</label>
+                                <select
+                                    value={imageFormData.photographerId}
+                                    onChange={(e) => {
+                                        const userId = e.target.value;
+                                        const user = usersList.find(u => String(u.uid || u.id) === String(userId));
+                                        setImageFormData({
+                                            ...imageFormData,
+                                            photographerId: userId,
+                                            photographer: user ? user.name : 'SNTL Admin'
+                                        });
+                                    }}
+                                    style={{ width: '100%', padding: '10px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--sn-border)', background: 'white' }}
+                                >
+                                    <option value="admin">SNTL Admin</option>
+                                    {usersList.map(u => (
+                                        <option key={u.uid || u.id} value={u.uid || u.id}>{u.name}</option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div style={{ display: 'flex', gap: 'var(--sp-6)', marginTop: 'var(--sp-2)' }}>
+                                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                                    <input
+                                        type="radio"
+                                        name="modal-premium"
+                                        checked={!imageFormData.isPremium}
+                                        onChange={() => setImageFormData({ ...imageFormData, isPremium: false, price: 'free' })}
+                                    />
+                                    Gratuit
+                                </label>
+                                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                                    <input
+                                        type="radio"
+                                        name="modal-premium"
+                                        checked={imageFormData.isPremium}
+                                        onChange={() => setImageFormData({ ...imageFormData, isPremium: true, price: 'premium' })}
+                                    />
+                                    Premium
+                                </label>
+                            </div>
+                            <div style={{ display: 'flex', gap: 'var(--sp-4)', marginTop: 'var(--sp-4)' }}>
+                                <button type="button" onClick={() => setIsImageModalOpen(false)} className="btn-secondary" style={{ flex: 1 }}>Annuler</button>
+                                <button type="submit" className="btn-primary" style={{ flex: 1 }}>Enregistrer</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* View User Profile Modal */}
+            {viewingUser && (
+                <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000 }} onClick={() => setViewingUser(null)}>
+                    <div style={{ background: 'white', padding: 'var(--sp-8)', borderRadius: 'var(--radius-md)', width: '100%', maxWidth: '500px', boxShadow: 'var(--shadow-xl)' }} onClick={e => e.stopPropagation()}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--sp-4)' }}>
+                            <h2 style={{ fontFamily: 'var(--font-heading)', fontSize: '1.5rem' }}>Profil Utilisateur</h2>
+                            <button onClick={() => setViewingUser(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--sn-gray)' }}>
+                                <X size={24} />
+                            </button>
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--sp-4)' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--sp-4)' }}>
+                                <div style={{ width: '64px', height: '64px', borderRadius: '50%', backgroundColor: 'var(--sn-gray)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.5rem', fontWeight: 'bold' }}>
+                                    {viewingUser.name?.charAt(0)?.toUpperCase()}
+                                </div>
+                                <div>
+                                    <h3 style={{ margin: 0, fontSize: '1.2rem' }}>{viewingUser.name}</h3>
+                                    <p style={{ margin: 0, color: 'var(--sn-gray)' }}>{viewingUser.email}</p>
+                                </div>
+                            </div>
+
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--sp-4)', backgroundColor: 'var(--sn-warm-gray)', padding: 'var(--sp-4)', borderRadius: 'var(--radius-md)' }}>
+                                <div>
+                                    <span style={{ fontSize: '0.8rem', color: 'var(--sn-gray)', display: 'block' }}>ID Utilisateur</span>
+                                    <span style={{ fontWeight: 500, fontSize: '0.9rem', wordBreak: 'break-all' }}>{viewingUser.uid || viewingUser.id}</span>
+                                </div>
+                                <div>
+                                    <span style={{ fontSize: '0.8rem', color: 'var(--sn-gray)', display: 'block' }}>Date d'inscription</span>
+                                    <span style={{ fontWeight: 500 }}>{viewingUser.createdAt ? new Date(viewingUser.createdAt).toLocaleDateString() : 'N/A'}</span>
+                                </div>
+                                <div>
+                                    <span style={{ fontSize: '0.8rem', color: 'var(--sn-gray)', display: 'block' }}>Rôle</span>
+                                    <span style={{ fontWeight: 500 }}>{viewingUser.role}</span>
+                                </div>
+                                <div>
+                                    <span style={{ fontSize: '0.8rem', color: 'var(--sn-gray)', display: 'block' }}>Statut</span>
+                                    <span style={{
+                                        display: 'inline-block',
+                                        padding: '2px 8px',
+                                        borderRadius: '12px',
+                                        fontSize: '0.8rem',
+                                        fontWeight: 500,
+                                        backgroundColor: viewingUser.status === 'Banni' ? '#ffebee' : '#e8f5e9',
+                                        color: viewingUser.status === 'Banni' ? '#c62828' : '#2e7d32'
+                                    }}>
+                                        {viewingUser.status}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     )
 }

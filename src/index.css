@@ -546,7 +546,7 @@ p {
   justify-content: center;
   gap: 60px;
   transform: rotate(-30deg);
-  opacity: 0.15;
+  opacity: 0.05;
 }
 
 .watermark-pattern span {

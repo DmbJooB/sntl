@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
-import { getWalks, getBankImages, getUsers } from '../services/db'
+import { getWalks, getBankImages, getUsers, getAppearanceSettings } from '../services/db'
 
 function useInView(ref) {
     const [inView, setInView] = useState(false)
@@ -26,6 +26,23 @@ function Section({ children, className = '' }) {
 /* ═══════ HERO ═══════ */
 function Hero() {
     const [offset, setOffset] = useState(0)
+    const [coverImage, setCoverImage] = useState('https://images.unsplash.com/photo-1489749798305-4fea3ae63d43?w=1920&h=1080&fit=crop')
+
+    useEffect(() => {
+        const fetchSettings = async () => {
+            try {
+                const settings = await getAppearanceSettings()
+                // Reject blob: URLs (they expire across sessions/ports) and use fallback
+                if (settings && settings.homeCover && !settings.homeCover.startsWith('blob:')) {
+                    setCoverImage(settings.homeCover)
+                }
+            } catch (error) {
+                console.error("Error fetching appearance settings for Hero:", error)
+            }
+        }
+        fetchSettings()
+    }, [])
+
     useEffect(() => {
         const handleScroll = () => setOffset(window.scrollY * 0.4)
         window.addEventListener('scroll', handleScroll)
@@ -45,7 +62,7 @@ function Hero() {
             <div style={{
                 position: 'absolute',
                 inset: 0,
-                backgroundImage: 'url(https://images.unsplash.com/photo-1489749798305-4fea3ae63d43?w=1920&h=1080&fit=crop)',
+                backgroundImage: `url(${coverImage})`,
                 backgroundSize: 'cover',
                 backgroundPosition: 'center',
                 transform: `translateY(${offset}px) scale(1.1)`,

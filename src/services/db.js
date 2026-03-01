@@ -59,11 +59,15 @@ export const getUsers = async () => {
 }
 
 export const getUserById = async (id) => {
+    const fallback = () => {
+        const p = mockPhotographers.find(p => p.id.toString() === id.toString());
+        return p ? { id: p.id, ...p } : null;
+    };
     return withFallback(
         getDoc(doc(db, 'users', id)).then(snapshot =>
             snapshot.exists() ? { id: snapshot.id, ...snapshot.data() } : null
         ),
-        null,
+        fallback,
         4000
     );
 }
@@ -164,7 +168,7 @@ export const getBankImages = async () => {
 
 export const getImageById = async (id) => {
     const fallback = () => {
-        const img = mockBankImages.find(img => img.id === id);
+        const img = mockBankImages.find(img => img.id.toString() === id.toString());
         return img || null;
     };
     return withFallback(
@@ -218,13 +222,40 @@ export const rejectImage = async (id) => {
 }
 
 // --- APPEARANCE SETTINGS ---
+// Map of legacy/wrong URLs to correct app routes
+const URL_CORRECTIONS = {
+    '/image-bank': '/banque-images',
+    '/photographers': '/photographes',
+    '/collectif': '/photographes',
+    '/le-collectif': '/photographes',
+    '/randonnee': '/randonnees',
+    '/events': '/evenements',
+}
+
+const sanitizeSettings = (data) => {
+    if (!data) return null
+    const out = { ...data }
+    // Fix blob: homeCover (blob: URLs expire across sessions)
+    if (out.homeCover && out.homeCover.startsWith('blob:')) {
+        out.homeCover = null
+    }
+    // Remap legacy menu link URLs to correct routes
+    if (Array.isArray(out.mainMenuLinks)) {
+        out.mainMenuLinks = out.mainMenuLinks.map(link => {
+            const corrected = URL_CORRECTIONS[link.url]
+            return corrected ? { ...link, url: corrected } : link
+        })
+    }
+    return out
+}
+
 export const getAppearanceSettings = async () => {
     return withFallback(
         getDoc(doc(db, 'settings', 'appearance')).then(snapshot =>
-            snapshot.exists() ? snapshot.data() : null
+            snapshot.exists() ? sanitizeSettings(snapshot.data()) : null
         ),
         null
-    );
+    )
 }
 
 export const updateAppearanceSettings = async (data) => {

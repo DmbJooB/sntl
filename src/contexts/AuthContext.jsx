@@ -21,8 +21,23 @@ export function AuthProvider({ children }) {
     // It does NOT wait for Firestore data — that happens in the background.
     const [loading, setLoading] = useState(true);
 
-    function signup(email, password) {
-        return createUserWithEmailAndPassword(auth, email, password);
+    async function signup(email, password, role = 'Utilisateur') {
+        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+        const user = userCredential.user;
+        const newUserData = {
+            uid: user.uid,
+            email: user.email,
+            name: user.displayName || user.email.split('@')[0],
+            role: role,
+            status: 'Actif',
+            createdAt: new Date().toISOString()
+        };
+        try {
+            await setDoc(doc(db, 'users', user.uid), newUserData, { merge: true });
+        } catch (error) {
+            console.warn("Could not save initial user data:", error);
+        }
+        return userCredential;
     }
 
     function login(email, password) {

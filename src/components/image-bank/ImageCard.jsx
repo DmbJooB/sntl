@@ -50,7 +50,7 @@ export default function ImageCard({ image }) {
                 {/* Watermark - subtle */}
                 <div style={{
                     position: 'absolute', inset: 0, pointerEvents: 'none',
-                    overflow: 'hidden', opacity: 0.12
+                    overflow: 'hidden', opacity: 0.05
                 }}>
                     <div style={{
                         position: 'absolute', inset: '-50%',

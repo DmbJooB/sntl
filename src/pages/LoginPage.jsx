@@ -5,6 +5,7 @@ import { useAuth } from '../contexts/AuthContext'
 export default function LoginPage() {
     const [email, setEmail] = useState('')
     const [password, setPassword] = useState('')
+    const [role, setRole] = useState('Utilisateur')
     const [isSignup, setIsSignup] = useState(false)
     const [error, setError] = useState('')
     const [loading, setLoading] = useState(false)
@@ -26,7 +27,7 @@ export default function LoginPage() {
 
         try {
             if (isSignup) {
-                await signup(email, password)
+                await signup(email, password, role)
             } else {
                 await login(email, password)
             }
@@ -117,6 +118,17 @@ export default function LoginPage() {
                         onChange={(e) => setPassword(e.target.value)}
                         required
                     />
+                    {isSignup && (
+                        <select
+                            style={inputStyle}
+                            value={role}
+                            onChange={(e) => setRole(e.target.value)}
+                            required
+                        >
+                            <option value="Utilisateur">Simple Utilisateur</option>
+                            <option value="Contributeur">Contributeur</option>
+                        </select>
+                    )}
                     <button type="submit" style={buttonStyle} disabled={loading}>
                         {isSignup ? "S'inscrire" : "Se connecter"}
                     </button>

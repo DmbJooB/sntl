@@ -1,37 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { getWalkBySlug, getUserById } from '../services/db'
+import WatermarkOverlay from '../components/WatermarkOverlay'
 import { Download, Share2, X, ChevronLeft, ChevronRight } from 'lucide-react'
 
-// Diagonal watermark overlay
-function WatermarkOverlay() {
-    return (
-        <div style={{
-            position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 2,
-            overflow: 'hidden', opacity: 0.15
-        }}>
-            <div style={{
-                position: 'absolute', inset: '-50%',
-                display: 'flex', flexWrap: 'wrap', gap: '36px',
-                transform: 'rotate(-30deg)',
-                userSelect: 'none'
-            }}>
-                {Array.from({ length: 20 }).map((_, i) => (
-                    <span key={i} style={{
-                        color: 'white',
-                        fontSize: '11px',
-                        fontWeight: 700,
-                        letterSpacing: '0.15em',
-                        textTransform: 'uppercase',
-                        fontFamily: 'var(--font-main)',
-                        whiteSpace: 'nowrap',
-                        textShadow: '0 1px 2px rgba(0,0,0,0.5)'
-                    }}>SUNU NATAAL</span>
-                ))}
-            </div>
-        </div>
-    )
-}
 
 function handleShare(photo, walk) {
     const url = window.location.href
@@ -42,13 +14,10 @@ function handleShare(photo, walk) {
     }
 }
 
-function handleDownload(photo, walk) {
-    const a = document.createElement('a')
-    a.href = photo.url
-    a.download = `sunu-nataal-${walk.slug}-photo.jpg`
-    a.target = '_blank'
-    a.rel = 'noopener noreferrer'
-    a.click()
+import { downloadWithWatermark } from '../utils/watermark';
+
+async function handleDownload(photo, walk) {
+    await downloadWithWatermark(photo.url, `sunu-nataal-${walk.slug}-photo.jpg`);
 }
 
 export default function WalkGalleryPage() {
@@ -151,8 +120,8 @@ export default function WalkGalleryPage() {
                                     width: '100%', height: '100%', objectFit: 'cover',
                                     transition: 'transform 0.3s ease'
                                 }} />
-                                {/* Watermark always visible on thumbnails */}
-                                <WatermarkOverlay />
+                                {/* Watermark less intrusive on walks */}
+                                <WatermarkOverlay opacity={0.3} />
                                 {/* Hover overlay with actions */}
                                 <div className="gallery-thumb-overlay" style={{
                                     position: 'absolute', inset: 0, zIndex: 3,
@@ -249,7 +218,7 @@ export default function WalkGalleryPage() {
                                 display: 'block'
                             }}
                         />
-                        <WatermarkOverlay />
+                        <WatermarkOverlay opacity={0.3} />
                     </div>
 
                     {/* Nav: Next */}

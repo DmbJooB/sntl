@@ -58,17 +58,26 @@ export default function WalksPage() {
                                 animationDelay: `${i * 100}ms`
                             }}>
                                 {/* Cover Image */}
-                                <div style={{ position: 'relative', overflow: 'hidden', aspectRatio: '4/3' }}>
-                                    <img src={walk.cover} alt={walk.title} className="card-image" style={{
-                                        width: '100%', height: '100%', objectFit: 'cover',
-                                        transition: 'transform 0.5s ease'
-                                    }} />
+                                <div style={{ position: 'relative', overflow: 'hidden', aspectRatio: '4/3', borderRadius: 'var(--radius-md)', background: 'var(--sn-gray-light)' }}>
+                                    {walk.cover ? (
+                                        <img src={walk.cover} alt={walk.title} className="card-image" style={{
+                                            width: '100%', height: '100%', objectFit: 'cover',
+                                            transition: 'transform 0.5s ease'
+                                        }} onError={(e) => {
+                                            e.target.onerror = null;
+                                            e.target.style.display = 'none';
+                                            e.target.parentElement.style.background = 'linear-gradient(45deg, var(--sn-black), var(--sn-gray))';
+                                        }} />
+                                    ) : (
+                                        <div style={{ width: '100%', height: '100%', background: 'linear-gradient(45deg, var(--sn-black), var(--sn-gray))' }} />
+                                    )}
 
                                     {/* Overlay Gradient */}
                                     <div style={{
                                         position: 'absolute', inset: 0,
-                                        background: 'linear-gradient(to top, rgba(0,0,0,0.7) 0%, transparent 50%)',
-                                        display: 'flex', alignItems: 'flex-end', padding: 'var(--sp-5)'
+                                        background: 'linear-gradient(to top, rgba(0,0,0,0.8) 0%, transparent 60%)',
+                                        display: 'flex', alignItems: 'flex-end', padding: 'var(--sp-5)',
+                                        pointerEvents: 'none'
                                     }}>
                                         <div style={{ width: '100%' }}>
                                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>

@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { getBankImages, getWalks } from '../services/db'
+import WatermarkOverlay from '../components/WatermarkOverlay'
+
 
 export default function FeedPage() {
     const batchSize = 8
@@ -121,7 +123,10 @@ export default function FeedPage() {
                                 animation: 'fadeInUp 0.5s cubic-bezier(.16,1,.3,1) both',
                                 animationDelay: `${(i % batchSize) * 60}ms`
                             }}>
-                                <img src={photo.url} alt={photo.title} loading="lazy" />
+                                <div style={{ position: 'relative', overflow: 'hidden' }}>
+                                    <img src={photo.url} alt={photo.title} loading="lazy" />
+                                    <WatermarkOverlay />
+                                </div>
                                 <div className="masonry-overlay" style={{
                                     display: 'flex',
                                     flexDirection: 'column',
@@ -194,7 +199,10 @@ export default function FeedPage() {
             {lightbox && (
                 <div className="lightbox-backdrop" onClick={() => setLightbox(null)}>
                     <button className="lightbox-close" onClick={() => setLightbox(null)}>✕</button>
-                    <img src={lightbox.url} alt="" className="lightbox-image" onClick={e => e.stopPropagation()} />
+                    <div className="lightbox-image-container" style={{ position: 'relative', overflow: 'hidden' }}>
+                        <img src={lightbox.url} alt="" className="lightbox-image" onClick={e => e.stopPropagation()} />
+                        <WatermarkOverlay />
+                    </div>
                     <div className="lightbox-info">
                         <h4>{lightbox.title}</h4>
                         <p>par {lightbox.photographer} · {lightbox.timestamp}</p>

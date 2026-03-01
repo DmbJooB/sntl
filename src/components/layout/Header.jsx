@@ -3,8 +3,9 @@ import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { ShoppingCart } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { useCart } from '../../contexts/CartContext'
+import { getAppearanceSettings } from '../../services/db'
 
-const navLinks = [
+const defaultNavLinks = [
     { path: '/', label: 'Accueil' },
     { path: '/randonnees', label: 'Randonnées' },
     { path: '/photographes', label: 'Photographes' },
@@ -16,11 +17,36 @@ const navLinks = [
 export default function Header() {
     const [scrolled, setScrolled] = useState(false)
     const [menuOpen, setMenuOpen] = useState(false)
+    const [navLinks, setNavLinks] = useState(defaultNavLinks)
     const location = useLocation()
     const { currentUser, logout } = useAuth()
     const { cartItems } = useCart()
     const navigate = useNavigate()
     const isHome = location.pathname === '/'
+
+    // Fetch dynamic menu links
+    useEffect(() => {
+        const fetchSettings = async () => {
+            try {
+                const settings = await getAppearanceSettings()
+                if (settings && settings.mainMenuLinks && settings.mainMenuLinks.length > 0) {
+                    // Filter out links without required fields, reject blob: URLs, and sort by order
+                    const validLinks = settings.mainMenuLinks
+                        .filter(link => link.label && link.url && !link.url.startsWith('blob:'))
+                        .map(link => ({ path: link.url, label: link.label, order: link.order || 0 }))
+                        .sort((a, b) => a.order - b.order)
+
+                    if (validLinks.length > 0) {
+                        setNavLinks(validLinks)
+                    }
+                }
+            } catch (error) {
+                console.error("Error fetching appearance settings for Header:", error)
+                // Default navLinks are already set
+            }
+        }
+        fetchSettings()
+    }, [])
 
     // Dynamic dashboard link based on role
     const getDashboardLink = () => {
@@ -167,7 +193,7 @@ export default function Header() {
                         <li>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--sp-3)' }}>
                                 {/* Cart Icon */}
-                                <Link to="/banque-images" style={{ position: 'relative', color: 'inherit', opacity: 0.85 }} title="Mon panier">
+                                <Link to="/panier" style={{ position: 'relative', color: 'inherit', opacity: 0.85 }} title="Mon panier">
                                     <ShoppingCart size={20} />
                                     {cartItems.length > 0 && (
                                         <span style={{

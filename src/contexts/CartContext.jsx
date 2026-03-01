@@ -1,20 +1,36 @@
-import React, { createContext, useContext, useState, useCallback } from 'react'
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 
 const CartContext = createContext(null)
 
 export function CartProvider({ children }) {
-    const [cartItems, setCartItems] = useState([])
-    const [favorites, setFavorites] = useState(new Set())
+    const [cartItems, setCartItems] = useState(() => {
+        const saved = localStorage.getItem('sn-cart')
+        return saved ? JSON.parse(saved) : []
+    })
+    const [favorites, setFavorites] = useState(() => {
+        const saved = localStorage.getItem('sn-favorites')
+        return saved ? new Set(JSON.parse(saved)) : new Set()
+    })
 
-    const addToCart = useCallback((image) => {
+    useEffect(() => {
+        localStorage.setItem('sn-cart', JSON.stringify(cartItems))
+    }, [cartItems])
+
+    useEffect(() => {
+        localStorage.setItem('sn-favorites', JSON.stringify(Array.from(favorites)))
+    }, [favorites])
+
+    const addToCart = useCallback((itemToAdd) => {
         setCartItems(prev => {
-            if (prev.find(i => i.id === image.id)) return prev
-            return [...prev, image]
+            // Check if exact same item (id + mode + size) is already in cart
+            const cartItemId = itemToAdd.cartItemId || `${itemToAdd.id}-${itemToAdd.purchaseMode}-${itemToAdd.selectedOption}`;
+            if (prev.find(i => (i.cartItemId || `${i.id}-${i.purchaseMode}-${i.selectedOption}`) === cartItemId)) return prev;
+            return [...prev, { ...itemToAdd, cartItemId }];
         })
     }, [])
 
-    const removeFromCart = useCallback((id) => {
-        setCartItems(prev => prev.filter(i => i.id !== id))
+    const removeFromCart = useCallback((cartItemIdOrId) => {
+        setCartItems(prev => prev.filter(i => (i.cartItemId || i.id) !== cartItemIdOrId))
     }, [])
 
     const toggleFavorite = useCallback((id) => {
@@ -26,11 +42,26 @@ export function CartProvider({ children }) {
         })
     }, [])
 
-    const isFavorite = useCallback((id) => favorites.has(id), [favorites])
-    const isInCart = useCallback((id) => cartItems.some(i => i.id === id), [cartItems])
+    const clearCart = useCallback(() => setCartItems([]), [])
+
+    const isFavorite = useCallback((id) => favorites.has(id.toString()), [favorites])
+    const isInCart = useCallback((id, purchaseMode, option) => {
+        if (!purchaseMode) return cartItems.some(i => i.id.toString() === id.toString());
+        const cartItemId = `${id}-${purchaseMode}-${option}`;
+        return cartItems.some(i => (i.cartItemId || i.id.toString()) === cartItemId);
+    }, [cartItems])
 
     return (
-        <CartContext.Provider value={{ cartItems, favorites, addToCart, removeFromCart, toggleFavorite, isFavorite, isInCart }}>
+        <CartContext.Provider value={{
+            cartItems,
+            favorites,
+            addToCart,
+            removeFromCart,
+            toggleFavorite,
+            isFavorite,
+            isInCart,
+            clearCart
+        }}>
             {children}
         </CartContext.Provider>
     )

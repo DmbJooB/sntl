@@ -12,6 +12,7 @@ import ImageDetailPage from './pages/ImageDetailPage'
 import EventsPage from './pages/EventsPage'
 import EventDetailPage from './pages/EventDetailPage'
 import WalkGalleryPage from './pages/WalkGalleryPage'
+import CartPage from './pages/CartPage'
 import FeedPage from './pages/FeedPage'
 import UserDashboard from './pages/dashboard/UserDashboard'
 import ContributorDashboard from './pages/dashboard/ContributorDashboard'
@@ -47,6 +48,7 @@ export default function App() {
                             <Route path="/evenements/:slug" element={<EventDetailPage />} />
                             <Route path="/randonnees/:slug/gallery" element={<WalkGalleryPage />} />
                             <Route path="/feed" element={<FeedPage />} />
+                            <Route path="/panier" element={<CartPage />} />
                             <Route path="/login" element={<LoginPage />} />
 
                             {/* Dashboards */}
