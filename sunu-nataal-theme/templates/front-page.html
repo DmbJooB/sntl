@@ -1,0 +1,123 @@
+<!-- wp:template-part {"slug":"header","tagName":"header"} /-->
+
+<!-- wp:group {"tagName":"main"} -->
+<main class="wp-block-group">
+
+    <!-- HERO SECTION -->
+    <!-- wp:cover {"url":"/wp-content/themes/sunu-nataal-theme/assets/images/hero_bg.jpg","dimRatio":30,"overlayColor":"black","minHeight":600,"align":"full","style":{"spacing":{"padding":{"top":"0","bottom":"0"}}}} -->
+    <div class="wp-block-cover alignfull has-black-background-color has-background-dim-30 has-background-dim"
+        style="min-height:600px;padding-top:0;padding-bottom:0">
+        <span aria-hidden="true"
+            class="wp-block-cover__background has-black-background-color has-background-dim-30 has-background-dim"></span>
+        <div class="wp-block-cover__inner-container">
+            <!-- wp:heading {"textAlign":"center","level":1,"style":{"typography":{"fontSize":"4rem","lineHeight":"1.1"}},"textColor":"white"} -->
+            <h1 class="has-text-align-center has-white-color has-text-color" style="font-size:4rem;line-height:1.1">Le
+                Sénégal à travers<br>nos objectifs</h1>
+            <!-- /wp:heading -->
+
+            <!-- wp:paragraph {"align":"center","style":{"typography":{"fontSize":"1.2rem"}},"textColor":"white"} -->
+            <p class="has-text-align-center has-white-color has-text-color" style="font-size:1.2rem">Collectif de
+                photographes · Randonnées · Banque d'images</p>
+            <!-- /wp:paragraph -->
+
+            <!-- wp:buttons {"layout":{"type":"flex","justifyContent":"center"}} -->
+            <div class="wp-block-buttons">
+                <!-- wp:button {"backgroundColor":"primary","textColor":"white","style":{"border":{"radius":"9999px"}}} -->
+                <div class="wp-block-button"><a
+                        class="wp-block-button__link has-white-color has-primary-background-color has-text-color has-background"
+                        style="border-radius:9999px">Découvrir les randonnées</a></div>
+                <!-- /wp:button -->
+            </div>
+            <!-- /wp:buttons -->
+        </div>
+    </div>
+    <!-- /wp:cover -->
+
+
+    <!-- UPCOMING WALKS -->
+    <!-- wp:group {"align":"wide","style":{"spacing":{"padding":{"top":"var:preset|spacing|40","bottom":"var:preset|spacing|40"}}}} -->
+    <div class="wp-block-group alignwide"
+        style="padding-top:var(--wp--preset--spacing--40);padding-bottom:var(--wp--preset--spacing--40)">
+        <!-- wp:group {"layout":{"type":"flex","justifyContent":"space-between"}} -->
+        <div class="wp-block-group">
+            <!-- wp:heading -->
+            <h2>Prochaines Randonnées</h2>
+            <!-- /wp:heading -->
+            <!-- wp:paragraph -->
+            <p><a href="/randonnees">Voir tout →</a></p>
+            <!-- /wp:paragraph -->
+        </div>
+        <!-- /wp:group -->
+
+        <!-- wp:query {"query":{"perPage":3,"pages":0,"offset":0,"postType":"randonnee","order":"desc","orderBy":"date","author":"","search":"","exclude":[],"sticky":"","inherit":false},"displayLayout":{"type":"flex","columns":3}} -->
+        <div class="wp-block-query">
+            <!-- wp:post-template -->
+            <!-- wp:group {"style":{"border":{"width":"1px"}},"borderColor":"border"} -->
+            <div class="wp-block-group has-border-border-color" style="border-width:1px">
+                <!-- wp:post-featured-image {"isLink":true,"height":"250px"} /-->
+                <!-- wp:group {"style":{"spacing":{"padding":{"top":"var:preset|spacing|20","right":"var:preset|spacing|20","bottom":"var:preset|spacing|20","left":"var:preset|spacing|20"}}}} -->
+                <div class="wp-block-group"
+                    style="padding-top:var(--wp--preset--spacing--20);padding-right:var(--wp--preset--spacing--20);padding-bottom:var(--wp--preset--spacing--20);padding-left:var(--wp--preset--spacing--20)">
+                    <!-- wp:post-title {"isLink":true} /-->
+                    <!-- wp:post-excerpt /-->
+                </div>
+            </div>
+            <!-- /wp:post-template -->
+        </div>
+        <!-- /wp:query -->
+    </div>
+    <!-- /wp:group -->
+
+
+    <!-- IMAGE BANK CTA -->
+    <!-- wp:cover {"overlayColor":"black","minHeight":400,"align":"full"} -->
+    <div class="wp-block-cover alignfull has-black-background-color has-background-dim" style="min-height:400px">
+        <div class="wp-block-cover__inner-container">
+            <!-- wp:heading {"textAlign":"center","textColor":"white"} -->
+            <h2 class="has-text-align-center has-white-color has-text-color">Banque d'images du Sénégal</h2>
+            <!-- /wp:heading -->
+            <!-- wp:paragraph {"align":"center","textColor":"white"} -->
+            <p class="has-text-align-center has-white-color has-text-color">Des milliers d'images haute résolution pour
+                vos projets.</p>
+            <!-- /wp:paragraph -->
+            <!-- wp:buttons {"layout":{"type":"flex","justifyContent":"center"}} -->
+            <div class="wp-block-buttons">
+                <!-- wp:button {"backgroundColor":"primary","textColor":"white"} -->
+                <div class="wp-block-button"><a
+                        class="wp-block-button__link has-white-color has-primary-background-color has-text-color has-background">Explorer
+                        la banque</a></div>
+                <!-- /wp:button -->
+            </div>
+            <!-- /wp:buttons -->
+        </div>
+    </div>
+    <!-- /wp:cover -->
+
+
+    <!-- PHOTOGRAPHERS -->
+    <!-- wp:group {"align":"wide","style":{"spacing":{"padding":{"top":"var:preset|spacing|40","bottom":"var:preset|spacing|40"}}}} -->
+    <div class="wp-block-group alignwide"
+        style="padding-top:var(--wp--preset--spacing--40);padding-bottom:var(--wp--preset--spacing--40)">
+        <!-- wp:heading {"textAlign":"center"} -->
+        <h2 class="has-text-align-center">Nos Photographes</h2>
+        <!-- /wp:heading -->
+
+        <!-- wp:query {"query":{"perPage":6,"postType":"photographe","inherit":false},"displayLayout":{"type":"flex","columns":6}} -->
+        <div class="wp-block-query">
+            <!-- wp:post-template -->
+            <!-- wp:group {"layout":{"type":"flex","orientation":"vertical","justifyContent":"center"}} -->
+            <div class="wp-block-group">
+                <!-- wp:post-featured-image {"isLink":true,"width":"120px","height":"120px","style":{"border":{"radius":"9999px"}}} /-->
+                <!-- wp:post-title {"textAlign":"center","isLink":true,"style":{"typography":{"fontSize":"1rem"}}} /-->
+            </div>
+            <!-- /wp:group -->
+            <!-- /wp:post-template -->
+        </div>
+        <!-- /wp:query -->
+    </div>
+    <!-- /wp:group -->
+
+</main>
+<!-- /wp:group -->
+
+<!-- wp:template-part {"slug":"footer","tagName":"footer"} /-->

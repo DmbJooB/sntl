@@ -1,0 +1,42 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // Public read for all files
+    match /{allPaths=**} {
+      allow read: if true;
+    }
+
+    // Users upload to their own folder (images only, max 20MB)
+    match /uploads/{userId}/{filename} {
+      allow write: if request.auth != null
+                   && request.auth.uid == userId
+                   && request.resource.size < 20 * 1024 * 1024
+                   && request.resource.contentType.matches('image/.*');
+    }
+
+    // Admins can upload to /uploads/ anywhere
+    match /uploads/{allPaths=**} {
+      allow write: if request.auth != null && request.auth.token.admin == true;
+    }
+
+    // Admin image bank uploads (/bank/ path)
+    match /bank/{allPaths=**} {
+      allow write: if request.auth != null && request.auth.token.admin == true;
+    }
+
+    // Walk/event cover images and gallery (admin only)
+    match /walks/{allPaths=**} {
+      allow write: if request.auth != null && request.auth.token.admin == true;
+    }
+
+    // User avatars (self or admin)
+    match /avatars/{userId}/{filename} {
+      allow write: if request.auth != null
+                   && (request.auth.uid == userId || request.auth.token.admin == true)
+                   && request.resource.size < 5 * 1024 * 1024
+                   && request.resource.contentType.matches('image/.*');
+    }
+  }
+}

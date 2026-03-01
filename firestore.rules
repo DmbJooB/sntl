@@ -1,0 +1,33 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Users: read own doc; admin can read/write all
+    match /users/{userId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && (request.auth.uid == userId || request.auth.token.admin == true);
+      allow create: if request.auth != null && (request.auth.uid == userId || request.auth.token.admin == true);
+      allow update: if request.auth != null && (request.auth.uid == userId || request.auth.token.admin == true);
+    }
+
+    // Walks: public read; admin write only
+    match /walks/{walkId} {
+      allow read: if true;
+      allow write: if request.auth != null && request.auth.token.admin == true;
+    }
+
+    // Bank Images: public read; contributors can add; admin can moderate
+    match /bankImages/{imageId} {
+      allow read: if true;
+      allow create: if request.auth != null;
+      allow update, delete: if request.auth != null && (request.auth.uid == resource.data.photographerId || request.auth.token.admin == true);
+    }
+
+    // Settings: public read; admin write
+    match /settings/{settingId} {
+      allow read: if true;
+      allow write: if request.auth != null && request.auth.token.admin == true;
+    }
+  }
+}

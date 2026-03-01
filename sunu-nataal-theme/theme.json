@@ -1,0 +1,195 @@
+{
+    "$schema": "https://schemas.wp.org/trunk/theme.json",
+    "version": 2,
+    "settings": {
+        "appearanceTools": true,
+        "layout": {
+            "contentSize": "1280px",
+            "wideSize": "1440px"
+        },
+        "color": {
+            "defaultPalette": false,
+            "palette": [
+                {
+                    "slug": "black",
+                    "color": "#1a1a1a",
+                    "name": "Black"
+                },
+                {
+                    "slug": "charcoal",
+                    "color": "#2d2d2d",
+                    "name": "Charcoal"
+                },
+                {
+                    "slug": "white",
+                    "color": "#fafafa",
+                    "name": "White"
+                },
+                {
+                    "slug": "cream",
+                    "color": "#f5f0eb",
+                    "name": "Cream"
+                },
+                {
+                    "slug": "sand",
+                    "color": "#d4a574",
+                    "name": "Sand"
+                },
+                {
+                    "slug": "sand-light",
+                    "color": "#e8c9a0",
+                    "name": "Sand Light"
+                },
+                {
+                    "slug": "terracotta",
+                    "color": "#b8623a",
+                    "name": "Terracotta"
+                },
+                {
+                    "slug": "gold",
+                    "color": "#c8956c",
+                    "name": "Gold"
+                },
+                {
+                    "slug": "gray",
+                    "color": "#6b6b6b",
+                    "name": "Gray"
+                },
+                {
+                    "slug": "gray-light",
+                    "color": "#a0a0a0",
+                    "name": "Gray Light"
+                },
+                {
+                    "slug": "flag-green",
+                    "color": "#009639",
+                    "name": "Flag Green"
+                },
+                {
+                    "slug": "flag-red",
+                    "color": "#E31B23",
+                    "name": "Flag Red"
+                }
+            ]
+        },
+        "typography": {
+            "fontFamilies": [
+                {
+                    "fontFamily": "\"Playfair Display\", serif",
+                    "slug": "heading",
+                    "name": "Playfair Display"
+                },
+                {
+                    "fontFamily": "\"Inter\", sans-serif",
+                    "slug": "body",
+                    "name": "Inter"
+                },
+                {
+                    "fontFamily": "\"DM Sans\", sans-serif",
+                    "slug": "accent",
+                    "name": "DM Sans"
+                }
+            ],
+            "fontSizes": [
+                {
+                    "slug": "small",
+                    "size": "0.85rem",
+                    "name": "Small"
+                },
+                {
+                    "slug": "medium",
+                    "size": "1rem",
+                    "name": "Medium"
+                },
+                {
+                    "slug": "large",
+                    "size": "1.2rem",
+                    "name": "Large"
+                },
+                {
+                    "slug": "xlarge",
+                    "size": "1.8rem",
+                    "name": "Extra Large"
+                },
+                {
+                    "slug": "xxlarge",
+                    "size": "2.8rem",
+                    "name": "Title"
+                },
+                {
+                    "slug": "huge",
+                    "size": "4rem",
+                    "name": "Hero"
+                }
+            ]
+        },
+        "spacing": {
+            "spacingScale": {
+                "steps": 0
+            },
+            "units": [
+                "px",
+                "em",
+                "rem",
+                "vh",
+                "vw",
+                "%"
+            ]
+        }
+    },
+    "styles": {
+        "blocks": {
+            "core/button": {
+                "border": {
+                    "radius": "9999px"
+                },
+                "typography": {
+                    "fontFamily": "var(--wp--preset--font-family--accent)",
+                    "fontWeight": "600"
+                }
+            }
+        },
+        "elements": {
+            "h1": {
+                "typography": {
+                    "fontFamily": "var(--wp--preset--font-family--heading)",
+                    "fontWeight": "700",
+                    "lineHeight": "1.2"
+                }
+            },
+            "h2": {
+                "typography": {
+                    "fontFamily": "var(--wp--preset--font-family--heading)",
+                    "fontWeight": "700",
+                    "lineHeight": "1.2"
+                }
+            },
+            "h3": {
+                "typography": {
+                    "fontFamily": "var(--wp--preset--font-family--heading)",
+                    "fontWeight": "700"
+                }
+            },
+            "h4": {
+                "typography": {
+                    "fontFamily": "var(--wp--preset--font-family--heading)",
+                    "fontWeight": "700"
+                }
+            },
+            "button": {
+                "typography": {
+                    "fontFamily": "var(--wp--preset--font-family--accent)"
+                }
+            }
+        },
+        "typography": {
+            "fontFamily": "var(--wp--preset--font-family--body)",
+            "lineHeight": "1.6",
+            "fontSize": "var(--wp--preset--font-size--medium)"
+        },
+        "color": {
+            "background": "var(--wp--preset--color--cream)",
+            "text": "var(--wp--preset--color--black)"
+        }
+    }
+}

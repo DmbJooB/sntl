@@ -1,0 +1,55 @@
+<!-- wp:template-part {"slug":"header","tagName":"header"} /-->
+
+<!-- wp:group {"tagName":"main","style":{"spacing":{"padding":{"top":"var:preset|spacing|40","bottom":"var:preset|spacing|40"}}}} -->
+<main class="wp-block-group"
+    style="padding-top:var(--wp--preset--spacing--40);padding-bottom:var(--wp--preset--spacing--40)">
+
+    <!-- wp:group {"align":"wide","style":{"spacing":{"margin":{"bottom":"var:preset|spacing|40"}}}} -->
+    <div class="wp-block-group alignwide" style="margin-bottom:var(--wp--preset--spacing--40)">
+        <!-- wp:heading {"level":1} -->
+        <h1>Le Collectif</h1>
+        <!-- /wp:heading -->
+        <!-- wp:paragraph {"style":{"typography":{"fontSize":"1.2rem"}},"textColor":"gray"} -->
+        <p class="has-gray-color has-text-color" style="font-size:1.2rem">Rencontrez les photographes qui capturent
+            l'âme du Sénégal.</p>
+        <!-- /wp:paragraph -->
+    </div>
+    <!-- /wp:group -->
+
+    <!-- wp:query {"query":{"perPage":12,"pages":0,"offset":0,"postType":"photographe","order":"asc","orderBy":"title","author":"","search":"","exclude":[],"sticky":"","inherit":true},"displayLayout":{"type":"flex","columns":4}} -->
+    <div class="wp-block-query">
+        <!-- wp:post-template -->
+        <!-- wp:group {"style":{"spacing":{"padding":{"top":"var:preset|spacing|30","bottom":"var:preset|spacing|30","left":"var:preset|spacing|20","right":"var:preset|spacing|20"}},"border":{"width":"1px","radius":"12px"}},"borderColor":"border","backgroundColor":"white"} -->
+        <div class="wp-block-group has-border-border-color has-white-background-color has-background"
+            style="border-width:1px;border-radius:12px;padding-top:var(--wp--preset--spacing--30);padding-right:var(--wp--preset--spacing--20);padding-bottom:var(--wp--preset--spacing--30);padding-left:var(--wp--preset--spacing--20)">
+            <!-- wp:group {"layout":{"type":"flex","justifyContent":"center"}} -->
+            <div class="wp-block-group">
+                <!-- wp:post-featured-image {"isLink":true,"width":"150px","height":"150px","style":{"border":{"radius":"9999px"}}} /-->
+            </div>
+            <!-- /wp:group -->
+
+            <!-- wp:post-title {"textAlign":"center","isLink":true,"style":{"typography":{"fontSize":"1.2rem","margin":{"top":"var:preset|spacing|20"}}}} /-->
+
+            <!-- wp:paragraph {"align":"center","textColor":"gray","style":{"typography":{"fontSize":"0.9rem"}}} -->
+            <p class="has-text-align-center has-gray-color has-text-color" style="font-size:0.9rem">Photographe</p>
+            <!-- /wp:paragraph -->
+
+            <!-- wp:group {"layout":{"type":"flex","justifyContent":"center"},"style":{"spacing":{"margin":{"top":"var:preset|spacing|20"}}}} -->
+            <div class="wp-block-group" style="margin-top:var(--wp--preset--spacing--20)">
+                <!-- wp:social-links {"iconColor":"gray","iconColorValue":"#6b6b6b","style":{"spacing":{"blockGap":"var:preset|spacing|10"}}} -->
+                <ul class="wp-block-social-links has-icon-color">
+                    <!-- wp:social-link {"url":"#","service":"instagram"} /--><!-- wp:social-link {"url":"#","service":"twitter"} /-->
+                </ul>
+                <!-- /wp:social-links -->
+            </div>
+            <!-- /wp:group -->
+        </div>
+        <!-- /wp:group -->
+        <!-- /wp:post-template -->
+    </div>
+    <!-- /wp:query -->
+
+</main>
+<!-- /wp:group -->
+
+<!-- wp:template-part {"slug":"footer","tagName":"footer"} /-->
